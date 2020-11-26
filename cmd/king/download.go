@@ -5,13 +5,13 @@ import (
 	"github.com/illiliti/king/internal/log"
 )
 
-func download(c *king.Context, args []string) {
+func download(c *king.Config, args []string) {
 	if len(args) == 0 {
 		log.Fatal("not enough arguments")
 	}
 
 	for _, n := range args {
-		p, err := c.NewPackage(n, king.AnyDB)
+		p, err := c.NewPackage(n, king.Any)
 
 		if err != nil {
 			log.Fatal(err)
@@ -24,7 +24,13 @@ func download(c *king.Context, args []string) {
 		}
 
 		for _, s := range ss {
-			if err := s.Download(); err != nil {
+			d, ok := s.Protocol.(king.Downloader)
+
+			if !ok {
+				continue
+			}
+
+			if err := d.Download(true); err != nil {
 				log.Fatal(err)
 			}
 		}

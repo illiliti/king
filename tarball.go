@@ -11,12 +11,12 @@ type Tarball struct {
 	Name string
 	Path string
 
-	context *Context
+	cfg *Config
 }
 
-func (c *Context) Tarball(n string) (*Tarball, error) {
+func (c *Config) Tarball(n string) (*Tarball, error) {
 	findTarballByName := func(n string) (*Tarball, error) {
-		p, err := c.NewPackage(n, AnyDB)
+		p, err := c.NewPackage(n, Any)
 
 		if err != nil {
 			return nil, err
@@ -36,9 +36,9 @@ func (c *Context) Tarball(n string) (*Tarball, error) {
 		}
 
 		return &Tarball{
-			Name:    p.Name,
-			Path:    tt[0],
-			context: c,
+			Name: p.Name,
+			Path: tt[0],
+			cfg:  c,
 		}, nil
 	}
 
@@ -51,12 +51,13 @@ func (c *Context) Tarball(n string) (*Tarball, error) {
 		}
 
 		return &Tarball{
-			Name:    n[:s],
-			Path:    p,
-			context: c,
+			Name: n[:s],
+			Path: p,
+			cfg:  c,
 		}, nil
 	}
 
+	// TODO prefer package over file if file is invalid ?
 	st, err := os.Stat(n)
 
 	if err != nil {

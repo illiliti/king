@@ -5,7 +5,7 @@ import (
 	"github.com/illiliti/king/internal/log"
 )
 
-func install(c *king.Context, args []string) {
+func install(c *king.Config, args []string) {
 	if len(args) == 0 {
 		log.Fatal("not enough arguments")
 	}
@@ -17,7 +17,7 @@ func install(c *king.Context, args []string) {
 			log.Fatal(err)
 		}
 
-		if err := t.Install(c.HasForce); err != nil {
+		if _, err := t.Install(c.HasForce); err != nil {
 			log.Fatal(err)
 		}
 	}

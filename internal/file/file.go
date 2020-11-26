@@ -41,6 +41,53 @@ func Sha256Sum(p string) (string, error) {
 	return hex.EncodeToString(c.Sum(nil)), nil
 }
 
+// TODO ?
+// func Replace(s, o, n string) error {
+// 	st, err := os.Stat(s)
+
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	f, err := os.OpenFile(s, os.O_RDWR, st.Mode())
+
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	var pp []string
+
+// 	sc := bufio.NewScanner(f)
+
+// 	for sc.Scan() {
+// 		p := sc.Text()
+
+// 		if p == o {
+// 			p = n
+// 		}
+
+// 		pp = append(pp, p)
+// 	}
+
+// 	if err := sc.Err(); err != nil {
+// 		return err
+// 	}
+
+// 	sort.Sort(sort.Reverse(sort.StringSlice(pp)))
+
+// 	w := bufio.NewWriter(f)
+
+// 	for _, p := range pp {
+// 		fmt.Fprintln(f, p)
+// 	}
+
+// 	if err := w.Flush(); err != nil {
+// 		return err
+// 	}
+
+// 	return f.Close()
+// }
+
 func CopySymlink(s, d string) error {
 	l, err := os.Readlink(s)
 
@@ -59,7 +106,11 @@ func CopySymlink(s, d string) error {
 	return os.Symlink(l, d)
 }
 
-func CopyRegular(s, d string) error {
+func CopyFile(s, d string) error {
+	if st, err := os.Stat(d); err == nil && st.IsDir() {
+		d = filepath.Join(d, filepath.Base(s))
+	}
+
 	st, err := os.Stat(s)
 
 	if err != nil {
@@ -111,7 +162,7 @@ func CopyDir(s, d string) error {
 
 			return os.Chmod(dp, m)
 		case m.IsRegular():
-			return CopyRegular(p, dp)
+			return CopyFile(p, dp)
 		case m&os.ModeSymlink != 0:
 			return CopySymlink(p, dp)
 		}
@@ -125,7 +176,19 @@ func CreateArchive(s, d string) error {
 		return err
 	}
 
-	return archiver.Archive([]string{s + "/."}, d)
+	w, err := os.Getwd()
+
+	if err != nil {
+		return err
+	}
+
+	// XXX why ?
+	if err := os.Chdir(s); err != nil {
+		return err
+	}
+
+	defer os.Chdir(w)
+	return archiver.Archive([]string{"."}, d)
 }
 
 func ExtractArchive(s, d string, c int) error {

@@ -10,7 +10,7 @@ import (
 	"github.com/illiliti/king/internal/log"
 )
 
-func list(c *king.Context, args []string) {
+func list(c *king.Config, args []string) {
 	w := bufio.NewWriter(os.Stdout)
 	defer w.Flush()
 
@@ -27,7 +27,7 @@ func list(c *king.Context, args []string) {
 
 		return nn
 	}() {
-		p, err := c.NewPackage(n, king.SysDB)
+		p, err := c.NewPackage(n, king.Sys)
 
 		if err != nil {
 			log.Fatal(err)

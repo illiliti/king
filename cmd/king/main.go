@@ -29,7 +29,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	c, err := king.NewContext()
+	c, err := king.NewConfig()
 
 	if err != nil {
 		log.Fatal(err)

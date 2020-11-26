@@ -6,8 +6,7 @@ import (
 	"strconv"
 )
 
-// TODO rename to Config ?
-type Context struct {
+type Config struct {
 	SysDB  string
 	UserDB []string
 
@@ -34,7 +33,7 @@ type Context struct {
 	HasDebug   bool
 }
 
-func NewContext() (*Context, error) {
+func NewConfig() (*Config, error) {
 	cd, err := os.UserCacheDir()
 	cp := os.Getenv("KISS_COMPRESS")
 	td := os.Getenv("KISS_TMPDIR")
@@ -55,16 +54,17 @@ func NewContext() (*Context, error) {
 		pd = strconv.Itoa(os.Getpid())
 	}
 
-	if rd == "" {
-		rd = "/"
-	}
+	// TODO
+	// if rd == "" {
+	// 	rd = "/"
+	// }
 
 	if td == "" {
 		td = filepath.Join(cd, "proc", pd)
 	}
 
-	return &Context{
-		SysDB:          filepath.Join(rd, "var/db/kiss/installed"),
+	return &Config{
+		SysDB:          filepath.Join(rd, InstalledDir),
 		UserDB:         filepath.SplitList(os.Getenv("KISS_PATH")),
 		CacheDir:       cd,
 		SourceDir:      filepath.Join(cd, "sources"),
@@ -73,7 +73,7 @@ func NewContext() (*Context, error) {
 		PkgDir:         filepath.Join(td, "pkg"),
 		BuildDir:       filepath.Join(td, "build"),
 		ExtractDir:     filepath.Join(td, "extract"),
-		RootDir:        rd,
+		RootDir:        rd, // TODO resolve symlink
 		ProcessID:      pd,
 		CompressFormat: cp,
 		UserHook:       os.Getenv("KISS_HOOK"),

@@ -12,7 +12,7 @@ import (
 
 var (
 	reverseDependsOnce syncutil.Once
-	reverseDepends     map[string][]string
+	reverseDepends     map[string][]*Package
 )
 
 type Dependency struct {
@@ -39,15 +39,15 @@ func (p *Package) Depends() ([]*Dependency, error) {
 				continue
 			}
 
-			dp := &Dependency{
+			d := &Dependency{
 				Name: fi[0],
 			}
 
 			if len(fi) == 2 && fi[1] == "make" {
-				dp.IsMake = true
+				d.IsMake = true
 			}
 
-			p.depends = append(p.depends, dp)
+			p.depends = append(p.depends, d)
 		}
 
 		return sc.Err()
@@ -56,8 +56,8 @@ func (p *Package) Depends() ([]*Dependency, error) {
 	return p.depends, err
 }
 
-func (p *Package) RecursiveDepends() ([]*Package, error) {
-	pp, err := p.Depends()
+func (p *Package) RecursiveDepends() ([]*Dependency, error) {
+	dd, err := p.Depends()
 
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -67,51 +67,44 @@ func (p *Package) RecursiveDepends() ([]*Package, error) {
 		return nil, err
 	}
 
-	var dpp []*Package
-
-	for _, dp := range pp {
-		if _, err := p.context.NewPackage(dp.Name, SysDB); !os.IsNotExist(err) {
-			continue
-		}
-
-		p, err := p.context.NewPackage(dp.Name, UserDB)
+	for _, d := range dd {
+		rp, err := p.cfg.NewPackage(d.Name, Any)
 
 		if err != nil {
 			return nil, err
 		}
 
-		rpp, err := p.RecursiveDepends()
+		rdd, err := rp.RecursiveDepends()
 
 		if err != nil {
 			return nil, err
 		}
 
-		dpp = append(dpp, rpp...)
-		dpp = append(dpp, p)
+		dd = append(rdd, dd...)
 	}
 
-	return dpp, nil
+	return dd, nil
 }
 
 // TODO UserDB ?
-func (p *Package) ReverseDepends() ([]string, error) {
+func (p *Package) ReverseDepends() ([]*Package, error) {
 	err := reverseDependsOnce.Do(func() error {
-		dd, err := file.ReadDirNames(p.context.SysDB)
+		dd, err := file.ReadDirNames(p.cfg.SysDB)
 
 		if err != nil {
 			return err
 		}
 
-		reverseDepends = make(map[string][]string, len(dd))
+		reverseDepends = make(map[string][]*Package, len(dd))
 
 		for _, n := range dd {
-			sp, err := p.context.NewPackage(n, SysDB)
+			sp, err := p.cfg.NewPackage(n, Sys)
 
 			if err != nil {
 				return err
 			}
 
-			pp, err := sp.Depends()
+			dd, err := sp.Depends()
 
 			if err != nil {
 				if os.IsNotExist(err) {
@@ -121,12 +114,12 @@ func (p *Package) ReverseDepends() ([]string, error) {
 				return err
 			}
 
-			for _, dp := range pp {
-				if dp.IsMake {
+			for _, d := range dd {
+				if d.IsMake {
 					continue
 				}
 
-				reverseDepends[dp.Name] = append(reverseDepends[dp.Name], sp.Name)
+				reverseDepends[d.Name] = append(reverseDepends[d.Name], sp)
 			}
 		}
 

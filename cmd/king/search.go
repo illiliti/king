@@ -10,7 +10,7 @@ import (
 	"github.com/illiliti/king/internal/log"
 )
 
-func search(c *king.Context, args []string) {
+func search(c *king.Config, args []string) {
 	if len(args) == 0 {
 		log.Fatal("not enough arguments")
 	}
@@ -31,5 +31,4 @@ func search(c *king.Context, args []string) {
 			}
 		}
 	}
-
 }

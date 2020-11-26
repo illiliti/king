@@ -8,92 +8,38 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/illiliti/king/internal/fetch"
-	"github.com/illiliti/king/internal/file"
+	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
 )
 
 type Source struct {
 	Protocol  interface{}
-	CustomDir string
-}
-
-type File struct {
-	Path  string
-	IsDir bool
+	CustomDir string // TODO rename ?
 }
 
 type Git struct {
-	URL string
+	URL     string
+	RefSpec config.RefSpec
+
+	pkg *Package
 }
 
 type HTTP struct {
 	URL          string
-	Path         string // TODO refactor ?
-	IsCached     bool
+	Path         string
 	HasNoExtract bool
+
+	pkg *Package
 }
 
-// TODO DownloadSources ?
+type File struct {
+	Path  string
+	IsDir bool // TODO remove ?
+
+	pkg *Package
+}
 
 func (p *Package) Sources() ([]*Source, error) {
-	newSource := func(s, d string) (*Source, error) {
-		if strings.HasPrefix(s, "git+") {
-			return &Source{Protocol: &Git{
-				URL: strings.TrimPrefix(s, "git+"),
-			}}, nil
-		}
-
-		if strings.Contains(s, "://") {
-			u, err := url.Parse(s)
-
-			if err != nil {
-				return nil, err
-			}
-
-			if u.Scheme != "http" && u.Scheme != "https" {
-				return nil, fmt.Errorf("unsupported protocol: %s", s)
-			}
-
-			cs := filepath.Join(p.context.SourceDir, p.Name, d, filepath.Base(u.Path))
-			ns := &Source{Protocol: &HTTP{
-				URL:  s,
-				Path: cs,
-			}}
-
-			if _, ok := u.Query()["no-extract"]; ok {
-				ns.Protocol.(*HTTP).HasNoExtract = true
-			}
-
-			if _, err := os.Stat(cs); !os.IsNotExist(err) {
-				ns.Protocol.(*HTTP).IsCached = true
-			}
-
-			return ns, nil
-		}
-
-		for _, l := range []string{
-			filepath.Join(p.Path, s),
-			filepath.Join(p.context.RootDir, s),
-		} {
-			st, err := os.Stat(l)
-
-			if err != nil {
-				if os.IsNotExist(err) {
-					continue
-				}
-
-				return nil, err
-			}
-
-			return &Source{Protocol: &File{
-				Path:  l,
-				IsDir: st.IsDir(),
-			}}, nil
-		}
-
-		return nil, fmt.Errorf("invalid source: %s", s)
-	}
-
 	err := p.sourcesOnce.Do(func() error {
 		f, err := os.Open(filepath.Join(p.Path, "sources"))
 
@@ -112,19 +58,25 @@ func (p *Package) Sources() ([]*Source, error) {
 				continue
 			}
 
-			var d string
+			s := new(Source)
 
 			if len(fi) == 2 {
-				d = fi[1]
+				s.CustomDir = fi[1]
 			}
 
-			s, err := newSource(fi[0], d)
+			switch {
+			case strings.HasPrefix(fi[0], "git+"):
+				s.Protocol, err = newGit(p, strings.TrimPrefix(fi[0], "git+"))
+			case strings.Contains(fi[0], "://"):
+				s.Protocol, err = newHTTP(p, fi[0], s.CustomDir)
+			default:
+				s.Protocol, err = newFile(p, fi[0])
+			}
 
 			if err != nil {
 				return err
 			}
 
-			s.CustomDir = d // XXX i hate this
 			p.sources = append(p.sources, s)
 		}
 
@@ -134,37 +86,79 @@ func (p *Package) Sources() ([]*Source, error) {
 	return p.sources, err
 }
 
-func (s *Source) Checksum() (string, error) {
-	switch v := s.Protocol.(type) {
-	case *Git:
-		return "", nil
-	case *HTTP:
-		return file.Sha256Sum(v.Path)
-	case *File:
-		if v.IsDir {
-			return "", nil
+func newGit(p *Package, s string) (*Git, error) {
+	i := strings.LastIndexAny(s, "#@")
+
+	if i < 0 {
+		return &Git{
+			URL:     s,
+			RefSpec: config.RefSpec("refs/heads/master:refs/remotes/origin/master"),
+			pkg:     p,
+		}, nil
+	}
+
+	switch s[i:][0] {
+	case '#':
+		if !plumbing.IsHash(s[i+1:]) {
+			return nil, fmt.Errorf("invalid hash: %s", s[i+1:])
 		}
 
-		return file.Sha256Sum(v.Path)
+		return &Git{
+			URL:     s[:i],
+			RefSpec: config.RefSpec(s[i+1:] + ":refs/remotes/origin/master"),
+			pkg:     p,
+		}, nil
+	case '@':
+		return &Git{
+			URL:     s[:i],
+			RefSpec: config.RefSpec("refs/heads/" + s[i+1:] + ":refs/remotes/origin/" + s[i+1:]),
+			pkg:     p,
+		}, nil
 	}
 
 	panic("unreachable")
 }
 
-func (s *Source) Download() error {
-	switch v := s.Protocol.(type) {
-	case *Git:
-		// found git source
-	case *File:
-		// found local source
-	case *HTTP:
-		if v.IsCached {
-			// found cached source
-			return nil
-		}
+func newHTTP(p *Package, s, d string) (*HTTP, error) {
+	u, err := url.Parse(s)
 
-		return fetch.HTTPDownload(v.URL, v.Path)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return nil, fmt.Errorf("unsupported protocol: %s", s)
+	}
+
+	return &HTTP{
+		URL:          s,
+		Path:         filepath.Join(p.cfg.SourceDir, p.Name, d, filepath.Base(u.Path)),
+		HasNoExtract: u.Query()["no-extract"] != nil,
+		pkg:          p,
+	}, nil
+}
+
+func newFile(p *Package, s string) (*File, error) {
+	for _, s := range []string{
+		filepath.Join(p.Path, s),
+		filepath.Join(p.cfg.RootDir, s),
+	} {
+		st, err := os.Stat(s)
+
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+
+			return nil, err
+		}
+
+		return &File{
+			Path:  s,
+			IsDir: st.IsDir(),
+			pkg:   p,
+		}, nil
+	}
+
+	return nil, fmt.Errorf("source not found: %s", s)
 }

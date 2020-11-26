@@ -5,13 +5,13 @@ import (
 	"github.com/illiliti/king/internal/log"
 )
 
-func remove(c *king.Context, args []string) {
+func remove(c *king.Config, args []string) {
 	if len(args) == 0 {
 		log.Fatal("not enough arguments")
 	}
 
 	for _, n := range args {
-		p, err := c.NewPackage(n, king.SysDB)
+		p, err := c.NewPackage(n, king.Sys)
 
 		if err != nil {
 			log.Fatal(err)

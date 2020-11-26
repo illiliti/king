@@ -8,7 +8,9 @@ import (
 	"path/filepath"
 )
 
-func (c *Context) RunRepoHook(n, p string) error {
+// TODO redo with default hooks (removeGarbage, ..., etc..)
+
+func (c *Config) RunRepoHook(n, p string) error {
 	h := filepath.Join(c.SysDB, p, n)
 	st, err := os.Stat(h)
 
@@ -38,7 +40,7 @@ func (c *Context) RunRepoHook(n, p string) error {
 	return nil
 }
 
-func (c *Context) RunUserHook(t, p, d string) error {
+func (c *Config) RunUserHook(t, p, d string) error {
 	if c.UserHook == "" {
 		return nil
 	}

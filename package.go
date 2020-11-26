@@ -12,7 +12,10 @@ type Package struct {
 	Name string
 	Path string
 
-	context *Context
+	cfg *Config
+
+	checksumsOnce syncutil.Once
+	checksums     map[string]bool
 
 	dependsOnce syncutil.Once
 	depends     []*Dependency
@@ -27,12 +30,12 @@ type Package struct {
 type PackageType int
 
 const (
-	AnyDB PackageType = iota
-	SysDB
-	UserDB
+	Any PackageType = iota
+	Sys
+	User
 )
 
-func (c *Context) NewPackage(n string, t PackageType) (*Package, error) {
+func (c *Config) NewPackage(n string, t PackageType) (*Package, error) {
 	findPackage := func(n string, dd ...string) (*Package, error) {
 		for _, db := range dd {
 			p := filepath.Join(db, n)
@@ -51,9 +54,9 @@ func (c *Context) NewPackage(n string, t PackageType) (*Package, error) {
 			}
 
 			return &Package{
-				Name:    n,
-				Path:    p,
-				context: c,
+				Name: n,
+				Path: p,
+				cfg:  c,
 			}, nil
 		}
 
@@ -61,11 +64,11 @@ func (c *Context) NewPackage(n string, t PackageType) (*Package, error) {
 	}
 
 	switch t {
-	case AnyDB:
+	case Any:
 		return findPackage(n, append(c.UserDB, c.SysDB)...)
-	case SysDB:
+	case Sys:
 		return findPackage(n, c.SysDB)
-	case UserDB:
+	case User:
 		return findPackage(n, c.UserDB...)
 	}
 

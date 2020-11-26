@@ -8,21 +8,23 @@ import (
 	"strings"
 
 	"github.com/illiliti/king/internal/file"
+	"github.com/illiliti/king/internal/skel"
 )
 
 func (p *Package) Remove(force bool) error {
-	pp, err := readManifest(filepath.Join(p.Path, "manifest"))
+	pp, err := skel.Slice(filepath.Join(p.Path, "manifest"))
 
 	if err != nil {
 		return err
 	}
 
-	ee, err := readEtcsums(filepath.Join(p.Path, "etcsums"))
+	ee, err := skel.Map(filepath.Join(p.Path, "etcsums"))
 
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
+	// TODO redo
 	if !force {
 		rpp, err := p.ReverseDepends()
 
@@ -35,11 +37,11 @@ func (p *Package) Remove(force bool) error {
 		}
 	}
 
-	if err := p.context.RunRepoHook("pre-remove", p.Name); err != nil {
+	if err := p.cfg.RunRepoHook("pre-remove", p.Name); err != nil {
 		return err
 	}
 
-	if err := p.context.RunUserHook("pre-remove", p.Name, p.Path); err != nil {
+	if err := p.cfg.RunUserHook("pre-remove", p.Name, p.Path); err != nil {
 		return err
 	}
 
@@ -47,7 +49,7 @@ func (p *Package) Remove(force bool) error {
 	defer signal.Reset(os.Interrupt)
 
 	for _, r := range pp {
-		rp := filepath.Join(p.context.RootDir, r)
+		rp := filepath.Join(p.cfg.RootDir, r)
 		st, err := os.Lstat(rp)
 
 		if err != nil {
@@ -58,9 +60,8 @@ func (p *Package) Remove(force bool) error {
 			return err
 		}
 
-		m := st.Mode()
-
-		if m.IsRegular() && strings.HasPrefix(r, "/etc/") {
+		switch m := st.Mode(); {
+		case m.IsRegular() && strings.HasPrefix(r, "/etc/"):
 			h, err := file.Sha256Sum(rp)
 
 			if err != nil {
@@ -70,13 +71,23 @@ func (p *Package) Remove(force bool) error {
 			if len(ee) > 0 && !ee[h] {
 				continue
 			}
+		case m.IsDir():
+			dd, err := file.ReadDirNames(rp)
+
+			if err != nil {
+				return err
+			}
+
+			if len(dd) > 0 {
+				continue
+			}
 		}
 
-		if err := removeFile(rp, m); err != nil {
+		if err := os.Remove(rp); err != nil {
 			return err
 		}
 	}
 
 	signal.Reset(os.Interrupt)
-	return p.context.RunUserHook("post-remove", p.Name, "null")
+	return p.cfg.RunUserHook("post-remove", p.Name, "null")
 }

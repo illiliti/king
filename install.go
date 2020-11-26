@@ -10,42 +10,48 @@ import (
 	"strings"
 
 	"github.com/illiliti/king/internal/file"
+	"github.com/illiliti/king/internal/skel"
+	"github.com/illiliti/king/internal/skel/manifest"
 )
 
-// TODO return (*Package, error) ?
-// TODO signal handling and cleanup
-func (t *Tarball) Install(force bool) error {
-	ed := filepath.Join(t.context.ExtractDir, t.Name)
+// TODO cleanup on signal
+func (t *Tarball) Install(force bool) (*Package, error) {
+	ed := filepath.Join(t.cfg.ExtractDir, t.Name)
 
 	if err := os.MkdirAll(ed, 0777); err != nil {
-		return err
+		return nil, err
+	}
+
+	if !t.cfg.HasDebug {
+		defer os.RemoveAll(ed)
 	}
 
 	if err := file.ExtractArchive(t.Path, ed, 0); err != nil {
-		return err
+		return nil, err
 	}
 
-	pdp := filepath.Join(t.context.SysDB, t.Name)
-	edp := filepath.Join(ed, "var/db/kiss/installed", t.Name)
+	pdp := filepath.Join(t.cfg.SysDB, t.Name)
+	edp := filepath.Join(ed, InstalledDir, t.Name)
 
-	npp, err := readManifest(filepath.Join(edp, "manifest"))
+	npp, err := skel.Slice(filepath.Join(edp, "manifest"))
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	opp, err := readManifest(filepath.Join(pdp, "manifest"))
+	opp, err := skel.Slice(filepath.Join(pdp, "manifest"))
 
 	if err != nil && !os.IsNotExist(err) {
-		return err
+		return nil, err
 	}
 
-	// ee, err := readEtcsums(filepath.Join(pdp, "etcsums"))
+	oee, err := skel.Map(filepath.Join(pdp, "etcsums"))
 
-	// if err != nil && !os.IsNotExist(err) {
-	// 	return err
-	// }
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
 
+	// TODO refactor ?
 	checkDepends := func() error {
 		f, err := os.Open(filepath.Join(edp, "depends"))
 
@@ -68,7 +74,7 @@ func (t *Tarball) Install(force bool) error {
 				continue
 			}
 
-			_, err := t.context.NewPackage(fi[0], SysDB)
+			_, err := t.cfg.NewPackage(fi[0], Sys)
 
 			if err != nil {
 				return err
@@ -80,18 +86,17 @@ func (t *Tarball) Install(force bool) error {
 
 	if !force {
 		for _, p := range npp {
-			_, err := os.Lstat(filepath.Join(ed, p))
-
-			if err != nil {
-				return err
+			if _, err := os.Lstat(filepath.Join(ed, p)); err != nil {
+				return nil, err
 			}
 		}
 
 		if err := checkDepends(); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
+	// TODO add dirs too
 	mpp := make(map[string]bool, len(npp))
 
 	for _, p := range npp {
@@ -101,27 +106,24 @@ func (t *Tarball) Install(force bool) error {
 			continue
 		}
 
-		s, err := filepath.EvalSymlinks(filepath.Join(t.context.RootDir, d))
+		s, err := filepath.EvalSymlinks(filepath.Join(t.cfg.RootDir, d))
 
 		if err != nil {
 			if os.IsNotExist(err) {
-				mpp[p] = true
-				continue // TODO simplify
+				s = d
+			} else {
+				return nil, err
 			}
-
-			return err
 		}
 
-		// FIXME RootDir can be symlink. in that case TrimPrefix will not work
-		// KISS don't care about it https://github.com/kisslinux/kiss/blob/1ae8340e49d59edbed54f769b971e09a8e934c45/kiss#L816
-		md := "/" + strings.TrimPrefix(s, t.context.RootDir)
-		mpp[filepath.Join(md, n)] = true
+		mpp[filepath.Join(strings.TrimPrefix(s, t.cfg.RootDir), n)] = true
 	}
 
 	var cpp []string
 
+	// TODO use Owner()
 	findConflicts := func(n string) error {
-		f, err := os.Open(filepath.Join(t.context.SysDB, n, "manifest"))
+		f, err := os.Open(filepath.Join(t.cfg.SysDB, n, "manifest"))
 
 		if err != nil {
 			return err
@@ -142,10 +144,10 @@ func (t *Tarball) Install(force bool) error {
 		return sc.Err()
 	}
 
-	dd, err := file.ReadDirNames(t.context.SysDB)
+	dd, err := file.ReadDirNames(t.cfg.SysDB)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, n := range dd {
@@ -154,42 +156,60 @@ func (t *Tarball) Install(force bool) error {
 		}
 
 		if err := findConflicts(n); err != nil {
-			return err
+			return nil, err
 		}
 	}
 
+	// TODO cleanup
 	if len(cpp) > 0 {
-		if !t.context.HasChoice {
-			return fmt.Errorf("package %s conflicts with other package", t.Name)
+		if !t.cfg.HasChoice {
+			return nil, fmt.Errorf("package %s conflicts with other package", t.Name)
 		}
 
-		cd := filepath.Join(ed, "var/db/kiss/choices")
+		cd := filepath.Join(ed, ChoicesDir)
 
 		if err := os.MkdirAll(cd, 0777); err != nil {
-			return err
+			return nil, err
 		}
 
 		for _, p := range cpp {
-			cp := filepath.Join(cd, t.Name+strings.ReplaceAll(p, "/", ">"))
+			n := t.Name + strings.ReplaceAll(p, "/", ">")
+
+			if mpp[p] {
+				delete(mpp, p)
+				mpp[filepath.Join(ChoicesDir, n)] = true
+			}
+
+			cp := filepath.Join(cd, n)
 
 			if err := os.Rename(filepath.Join(ed, p), cp); err != nil {
-				return err
+				return nil, err
 			}
 		}
 
-		npp, err = generateManifest(ed)
+		f, err := os.Create(filepath.Join(edp, "manifest"))
 
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		if err := saveManifest(npp, filepath.Join(edp, "manifest")); err != nil {
-			return err
+		npp, err = manifest.Generate(ed)
+
+		if err != nil {
+			return nil, err
+		}
+
+		if err := skel.Save(npp, f); err != nil {
+			return nil, err
+		}
+
+		if err := f.Close(); err != nil {
+			return nil, err
 		}
 	}
 
-	if err := t.context.RunUserHook("pre-install", t.Name, ed); err != nil {
-		return err
+	if err := t.cfg.RunUserHook("pre-install", t.Name, ed); err != nil {
+		return nil, err
 	}
 
 	signal.Ignore(os.Interrupt)
@@ -202,35 +222,74 @@ func (t *Tarball) Install(force bool) error {
 		st, err := os.Lstat(dp)
 
 		if err != nil {
-			return err
+			return nil, err
 		}
 
-		m := st.Mode()
-		rp := filepath.Join(t.context.RootDir, p)
+		rp := filepath.Join(t.cfg.RootDir, p)
 
-		if m.IsRegular() && strings.HasPrefix(p, "/etc/") {
-			// TODO https://k1ss.org/package-manager#3.3
+		switch m := st.Mode(); {
+		case m.IsDir():
+			if err := os.MkdirAll(rp, 0777); err != nil {
+				return nil, err
+			}
+
+			err = os.Chmod(rp, m)
+		case m.IsRegular():
+			if strings.HasPrefix(p, "/etc/") {
+				// TODO https://k1ss.org/package-manager#3.3
+			}
+
+			err = file.CopyFile(dp, rp)
+		case m&os.ModeSymlink != 0:
+			err = file.CopySymlink(dp, rp)
 		}
 
-		if err := installFile(dp, rp, m); err != nil {
-			return err
+		if err != nil {
+			return nil, err
 		}
 	}
 
-	for _, p := range opp {
-		if mpp[p] {
+	for _, r := range opp {
+		if mpp[r] {
 			continue
 		}
 
-		rp := filepath.Join(t.context.RootDir, p)
-		st, err := os.Stat(rp)
+		rp := filepath.Join(t.cfg.RootDir, r)
+		st, err := os.Lstat(rp)
 
 		if err != nil {
-			return err
+			if os.IsNotExist(err) {
+				continue
+			}
+
+			return nil, err
 		}
 
-		if err := removeFile(rp, st.Mode()); err != nil {
-			return err
+		switch m := st.Mode(); {
+		case m.IsRegular() && strings.HasPrefix(r, "/etc/"):
+			h, err := file.Sha256Sum(rp)
+
+			if err != nil {
+				return nil, err
+			}
+
+			if len(oee) > 0 && !oee[h] {
+				continue
+			}
+		case m.IsDir():
+			dd, err := file.ReadDirNames(rp)
+
+			if err != nil {
+				return nil, err
+			}
+
+			if len(dd) > 0 {
+				continue
+			}
+		}
+
+		if err := os.Remove(rp); err != nil {
+			return nil, err
 		}
 	}
 
@@ -238,9 +297,13 @@ func (t *Tarball) Install(force bool) error {
 
 	signal.Reset(os.Interrupt)
 
-	if err := t.context.RunRepoHook("post-install", t.Name); err != nil {
-		return err
+	if err := t.cfg.RunRepoHook("post-install", t.Name); err != nil {
+		return nil, err
 	}
 
-	return t.context.RunUserHook("post-install", t.Name, pdp)
+	return &Package{
+		Name: t.Name,
+		Path: pdp,
+		cfg:  t.cfg,
+	}, t.cfg.RunUserHook("post-install", t.Name, pdp)
 }
