@@ -7,32 +7,27 @@ import (
 	"strings"
 )
 
+// TODO String() ?
 type Version struct {
-	Current string
+	Version string
 	Release string
 }
 
 func (p *Package) Version() (*Version, error) {
-	err := p.versionOnce.Do(func() error {
-		b, err := ioutil.ReadFile(filepath.Join(p.Path, "version"))
+	b, err := ioutil.ReadFile(filepath.Join(p.Path, "version"))
 
-		if err != nil {
-			return err
-		}
+	if err != nil {
+		return nil, err
+	}
 
-		vr := strings.Fields(string(b))
+	vr := strings.Fields(string(b))
 
-		if len(vr) < 2 {
-			return fmt.Errorf("invalid version: %s", b)
-		}
+	if len(vr) != 2 {
+		return nil, fmt.Errorf("version %s: malformed", b)
+	}
 
-		p.version = &Version{
-			Current: vr[0],
-			Release: vr[1],
-		}
-
-		return nil
-	})
-
-	return p.version, err
+	return &Version{
+		Version: vr[0],
+		Release: vr[1],
+	}, nil
 }

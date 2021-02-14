@@ -12,6 +12,8 @@ import (
 	"github.com/mholt/archiver/v3"
 )
 
+// TODO rename file.go to fs.go ?
+
 func ReadDirNames(d string) ([]string, error) {
 	f, err := os.Open(d)
 
@@ -23,7 +25,7 @@ func ReadDirNames(d string) ([]string, error) {
 	return f.Readdirnames(0)
 }
 
-func Sha256Sum(p string) (string, error) {
+func Sha256(p string) (string, error) {
 	f, err := os.Open(p)
 
 	if err != nil {
@@ -40,53 +42,6 @@ func Sha256Sum(p string) (string, error) {
 
 	return hex.EncodeToString(c.Sum(nil)), nil
 }
-
-// TODO ?
-// func Replace(s, o, n string) error {
-// 	st, err := os.Stat(s)
-
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	f, err := os.OpenFile(s, os.O_RDWR, st.Mode())
-
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	var pp []string
-
-// 	sc := bufio.NewScanner(f)
-
-// 	for sc.Scan() {
-// 		p := sc.Text()
-
-// 		if p == o {
-// 			p = n
-// 		}
-
-// 		pp = append(pp, p)
-// 	}
-
-// 	if err := sc.Err(); err != nil {
-// 		return err
-// 	}
-
-// 	sort.Sort(sort.Reverse(sort.StringSlice(pp)))
-
-// 	w := bufio.NewWriter(f)
-
-// 	for _, p := range pp {
-// 		fmt.Fprintln(f, p)
-// 	}
-
-// 	if err := w.Flush(); err != nil {
-// 		return err
-// 	}
-
-// 	return f.Close()
-// }
 
 func CopySymlink(s, d string) error {
 	l, err := os.Readlink(s)
@@ -171,7 +126,7 @@ func CopyDir(s, d string) error {
 	})
 }
 
-func CreateArchive(s, d string) error {
+func Archive(s, d string) error {
 	if err := os.MkdirAll(filepath.Dir(d), 0777); err != nil {
 		return err
 	}
@@ -182,7 +137,6 @@ func CreateArchive(s, d string) error {
 		return err
 	}
 
-	// XXX why ?
 	if err := os.Chdir(s); err != nil {
 		return err
 	}
@@ -191,7 +145,7 @@ func CreateArchive(s, d string) error {
 	return archiver.Archive([]string{"."}, d)
 }
 
-func ExtractArchive(s, d string, c int) error {
+func Unarchive(s, d string, c int) error {
 	f, err := archiver.ByExtension(s)
 
 	if err != nil {
@@ -220,13 +174,13 @@ func ExtractArchive(s, d string, c int) error {
 	case *archiver.TarZstd:
 		v.Tar.StripComponents = c
 	default:
-		return fmt.Errorf("unsupported format: %s", f)
+		return fmt.Errorf("archive %s: unsupported format", f)
 	}
 
 	u, ok := f.(archiver.Unarchiver)
 
 	if !ok {
-		return fmt.Errorf("archive can't be extracted: %s", f)
+		return fmt.Errorf("archive %s: cannot be extracted", f)
 	}
 
 	return u.Unarchive(s, d)

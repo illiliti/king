@@ -18,9 +18,9 @@ func search(c *king.Config, args []string) {
 	w := bufio.NewWriter(os.Stdout)
 	defer w.Flush()
 
-	for _, pt := range args {
+	for _, n := range args {
 		for _, db := range append(c.UserDB, c.SysDB) {
-			mm, err := filepath.Glob(filepath.Join(db, pt))
+			mm, err := filepath.Glob(filepath.Join(db, n))
 
 			if err != nil {
 				log.Fatal(err)

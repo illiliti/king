@@ -7,9 +7,10 @@ import (
 	"strings"
 
 	"github.com/illiliti/king/internal/file"
-	"github.com/illiliti/king/internal/skel/manifest"
+	"github.com/illiliti/king/internal/manifest"
 )
 
+// TODO String() ?
 type Alternative struct {
 	Name string
 	Path string
@@ -17,72 +18,72 @@ type Alternative struct {
 	cfg *Config
 }
 
-func (c *Config) NewAlternative(n, p string) (*Alternative, error) {
-	_, err := os.Lstat(filepath.Join(c.RootDir, ChoicesDir,
-		n+strings.ReplaceAll(p, "/", ">")))
-
-	return &Alternative{
-		Name: n,
-		Path: p,
-		cfg:  c,
-	}, err
-}
-
-func (c *Config) Alternatives() ([]*Alternative, error) {
+func (c *Config) NewAlternativeByPath(p string) (*Alternative, error) {
 	dd, err := file.ReadDirNames(filepath.Join(c.RootDir, ChoicesDir))
 
 	if err != nil {
 		return nil, err
 	}
 
-	aa := make([]*Alternative, 0, len(dd))
+	s := strings.ReplaceAll(p, "/", ">")
 
 	for _, n := range dd {
-		i := strings.Index(n, ">")
-
-		if i < 0 {
-			return nil, fmt.Errorf("invalid alternative: %s", n)
+		if !strings.HasSuffix(n, s) {
+			continue
 		}
 
-		aa = append(aa, &Alternative{
-			Name: n[:i],
-			Path: strings.ReplaceAll(n[i:], ">", "/"),
+		return &Alternative{
+			Name: strings.TrimSuffix(n, s),
+			Path: p,
 			cfg:  c,
-		})
+		}, nil
 	}
 
-	return aa, nil
+	return nil, fmt.Errorf("alternative %s: not found", p)
+}
+
+func (c *Config) NewAlternativeByNamePath(n, p string) (*Alternative, error) {
+	a := filepath.Join(c.RootDir, ChoicesDir, n+strings.ReplaceAll(p, "/", ">"))
+	st, err := os.Lstat(a)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if st.IsDir() {
+		return nil, fmt.Errorf("alternative %s: is a directory", a)
+	}
+
+	return &Alternative{
+		Name: n,
+		Path: p,
+		cfg:  c,
+	}, nil
 }
 
 func (a *Alternative) Swap() (*Alternative, error) {
-	sp, err := a.cfg.NewPackage(a.Name, Sys)
+	sp, err := a.cfg.NewPackageByName(Sys, a.Name)
 
 	if err != nil {
 		return nil, err
 	}
+
+	// TODO what we supposed to do if path already removed?
+	cp, err := a.cfg.NewPackageByPath(a.Path)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer pathsOnce.Reset()
 
 	ap := strings.ReplaceAll(a.Path, "/", ">")
-	rp := filepath.Join(a.cfg.RootDir, a.Path)
-	cp, err := a.cfg.Owner(a.Path)
 
-	if err != nil {
+	if err := replace(cp, true, a.Path, filepath.Join(ChoicesDir, cp.Name+ap)); err != nil {
 		return nil, err
 	}
 
-	cn := cp.Name + ap
-
-	// TODO what if package removed ?
-	if err := os.Rename(rp, filepath.Join(a.cfg.RootDir, ChoicesDir, cn)); err != nil {
-		return nil, err
-	}
-
-	if err := manifest.Replace(filepath.Join(cp.Path, "manifest"), a.Path, filepath.Join(ChoicesDir, cn)); err != nil {
-		return nil, err
-	}
-
-	an := sp.Name + ap
-
-	if err := os.Rename(filepath.Join(a.cfg.RootDir, ChoicesDir, an), rp); err != nil {
+	if err := replace(sp, false, filepath.Join(ChoicesDir, sp.Name+ap), a.Path); err != nil {
 		return nil, err
 	}
 
@@ -90,5 +91,31 @@ func (a *Alternative) Swap() (*Alternative, error) {
 		Name: cp.Name,
 		Path: a.Path,
 		cfg:  a.cfg,
-	}, manifest.Replace(filepath.Join(sp.Path, "manifest"), filepath.Join(ChoicesDir, an), a.Path)
+	}, nil
+}
+
+func replace(p *Package, c bool, f, t string) error {
+	if err := os.Rename(filepath.Join(p.cfg.RootDir, f), filepath.Join(p.cfg.RootDir, t)); err != nil {
+		return err
+	}
+
+	m, err := manifest.Open(filepath.Join(p.Path, "manifest"))
+
+	if err != nil {
+		return err
+	}
+
+	m.Replace(f, t)
+
+	if c {
+		m.Insert(ChoicesDir + "/")
+	} else {
+		m.Delete(ChoicesDir + "/")
+	}
+
+	if err := m.Flush(); err != nil {
+		return err
+	}
+
+	return m.Close()
 }

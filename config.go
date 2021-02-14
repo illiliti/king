@@ -6,6 +6,22 @@ import (
 	"strconv"
 )
 
+// TODO rename ?
+const (
+	InstalledDir = "/var/db/kiss/installed"
+	ChoicesDir   = "/var/db/kiss/choices"
+
+	// BaseDir        = "/var/db/king"
+	// BaseDir        = "/var/lib/king"
+	// DatabaseDir    = BaseDir + "/database"
+	// AlternativeDir = BaseDir + "/alternative"
+	// SourceDir      = BaseDir + "/source"
+	// SourceDir      = "/var/tmp/king/source"
+	// ...
+)
+
+// TODO use config file(toml, yaml, sr.ht/~emersion/go-scfg, github.com/go-ini/ini)
+// instead of environment variables ?
 type Config struct {
 	SysDB  string
 	UserDB []string
@@ -33,6 +49,7 @@ type Config struct {
 	HasDebug   bool
 }
 
+// TODO clean
 func NewConfig() (*Config, error) {
 	cd, err := os.UserCacheDir()
 	cp := os.Getenv("KISS_COMPRESS")
@@ -44,6 +61,14 @@ func NewConfig() (*Config, error) {
 		return nil, err
 	}
 
+	if rd != "" {
+		rd, err = filepath.EvalSymlinks(rd)
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	cd = filepath.Join(cd, "kiss")
 
 	if cp == "" {
@@ -53,11 +78,6 @@ func NewConfig() (*Config, error) {
 	if pd == "" {
 		pd = strconv.Itoa(os.Getpid())
 	}
-
-	// TODO
-	// if rd == "" {
-	// 	rd = "/"
-	// }
 
 	if td == "" {
 		td = filepath.Join(cd, "proc", pd)
@@ -73,7 +93,7 @@ func NewConfig() (*Config, error) {
 		PkgDir:         filepath.Join(td, "pkg"),
 		BuildDir:       filepath.Join(td, "build"),
 		ExtractDir:     filepath.Join(td, "extract"),
-		RootDir:        rd, // TODO resolve symlink
+		RootDir:        rd,
 		ProcessID:      pd,
 		CompressFormat: cp,
 		UserHook:       os.Getenv("KISS_HOOK"),

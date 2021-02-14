@@ -8,6 +8,8 @@ import (
 	"github.com/illiliti/king/internal/log"
 )
 
+// TODO rewrite usage message
+// TODO switch to POSIX flags, e.g: king install -f -v package...
 const usage = `usage: king [a|b|c|d|i|l|r|s|u|v] [package ...]
 
 alternative List or swap to alternatives
@@ -57,6 +59,6 @@ func main() {
 	case "version", "v":
 		log.Info("PRE-ALPHA")
 	default:
-		log.Fatal("invalid action:", os.Args[1])
+		log.Fatalf("action %s: invalid", os.Args[1])
 	}
 }

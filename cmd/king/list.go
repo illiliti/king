@@ -19,15 +19,15 @@ func list(c *king.Config, args []string) {
 			return args
 		}
 
-		nn, err := file.ReadDirNames(c.SysDB)
+		dd, err := file.ReadDirNames(c.SysDB)
 
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		return nn
+		return dd
 	}() {
-		p, err := c.NewPackage(n, king.Sys)
+		p, err := c.NewPackageByName(king.Sys, n)
 
 		if err != nil {
 			log.Fatal(err)
@@ -39,6 +39,6 @@ func list(c *king.Config, args []string) {
 			log.Fatal(err)
 		}
 
-		fmt.Fprintln(w, p.Name, v.Current, v.Release)
+		fmt.Fprintln(w, p.Name, v.Version, v.Release)
 	}
 }

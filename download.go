@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/henvic/ctxsignal"
+	"github.com/henvic/ctxsignal" // TODO github.com/golang/go/issues/37255
 )
 
 type Downloader interface {
@@ -39,7 +39,7 @@ func (h *HTTP) Download(force bool) error {
 	defer rp.Body.Close()
 
 	if rp.StatusCode != http.StatusOK {
-		return fmt.Errorf("%s: %s", h.URL, rp.Status)
+		return fmt.Errorf("download %s: %s", h.URL, rp.Status)
 	}
 
 	if err := os.MkdirAll(filepath.Dir(h.Path), 0777); err != nil {

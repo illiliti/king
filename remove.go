@@ -7,71 +7,81 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/illiliti/king/internal/etcsum"
 	"github.com/illiliti/king/internal/file"
-	"github.com/illiliti/king/internal/skel"
+	"github.com/illiliti/king/internal/manifest"
 )
 
 func (p *Package) Remove(force bool) error {
-	pp, err := skel.Slice(filepath.Join(p.Path, "manifest"))
+	dd, err := p.ReverseDepends()
 
-	if err != nil {
-		return err
+	if !force && err == nil && len(dd) > 0 {
+		return fmt.Errorf("remove %s: required by %s", p.Name, strings.Join(dd, ", "))
 	}
 
-	ee, err := skel.Map(filepath.Join(p.Path, "etcsums"))
+	om, err := manifest.Open(filepath.Join(p.Path, "manifest"))
 
 	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
-	// TODO redo
-	if !force {
-		rpp, err := p.ReverseDepends()
+	defer om.Close()
 
-		if err != nil {
-			return err
-		}
+	oe, err := etcsum.Open(filepath.Join(p.Path, "etcsums"))
 
-		if len(rpp) > 0 {
-			return fmt.Errorf("package %s required by other packages: %s", p.Name, rpp)
-		}
-	}
-
-	if err := p.cfg.RunRepoHook("pre-remove", p.Name); err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		return err
 	}
 
-	if err := p.cfg.RunUserHook("pre-remove", p.Name, p.Path); err != nil {
-		return err
-	}
+	defer oe.Close()
+
+	defer pathsOnce.Reset()
+	defer dependenciesOnce.Reset()
 
 	signal.Ignore(os.Interrupt)
 	defer signal.Reset(os.Interrupt)
 
-	for _, r := range pp {
+	// TODO automagically swap dangling alternatives
+	// for _, r := range om.Remove() {
+	// 	a, err := p.cfg.NewAlternativeByPath(r)
+
+	// 	if err != nil {
+	// 		continue
+	// 	}
+
+	// 	if a.Name == p.Name {
+	// 		continue
+	// 	}
+
+	// 	if _, err := a.Swap(); err != nil {
+	// 		return err
+	// 	}
+	// }
+
+	for _, r := range om.Remove() {
 		rp := filepath.Join(p.cfg.RootDir, r)
 		st, err := os.Lstat(rp)
 
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
+		if os.IsNotExist(err) {
+			continue
+		}
 
+		if err != nil {
 			return err
 		}
 
-		switch m := st.Mode(); {
-		case m.IsRegular() && strings.HasPrefix(r, "/etc/"):
-			h, err := file.Sha256Sum(rp)
+		switch {
+		case st.Mode().IsRegular() && strings.HasPrefix(r, "/etc/"):
+			x, err := file.Sha256(rp)
 
 			if err != nil {
 				return err
 			}
 
-			if len(ee) > 0 && !ee[h] {
+			if !oe.HasEntry(x) {
 				continue
 			}
-		case m.IsDir():
+		case st.IsDir():
 			dd, err := file.ReadDirNames(rp)
 
 			if err != nil {
@@ -88,6 +98,5 @@ func (p *Package) Remove(force bool) error {
 		}
 	}
 
-	signal.Reset(os.Interrupt)
-	return p.cfg.RunUserHook("post-remove", p.Name, "null")
+	return nil
 }

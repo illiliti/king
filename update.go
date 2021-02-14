@@ -24,16 +24,6 @@ func (c *Config) Update() ([]*Package, error) {
 			return nil, err
 		}
 
-		rr, err := r.Remotes()
-
-		if err != nil {
-			return nil, err
-		}
-
-		if len(rr) == 0 {
-			continue
-		}
-
 		w, err := r.Worktree()
 
 		if err != nil {
@@ -43,7 +33,7 @@ func (c *Config) Update() ([]*Package, error) {
 		if err := w.PullContext(ctx, &git.PullOptions{
 			Progress:          os.Stderr,
 			RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
-		}); err != nil && err != git.NoErrAlreadyUpToDate {
+		}); err != nil && err != git.NoErrAlreadyUpToDate && err != git.ErrRemoteNotFound {
 			return nil, err
 		}
 	}
@@ -58,7 +48,7 @@ func (c *Config) Update() ([]*Package, error) {
 
 	// TODO concurrency
 	for _, n := range dd {
-		sp, err := c.NewPackage(n, Sys)
+		sp, err := c.NewPackageByName(Sys, n)
 
 		if err != nil {
 			return nil, err
@@ -70,7 +60,7 @@ func (c *Config) Update() ([]*Package, error) {
 			return nil, err
 		}
 
-		up, err := c.NewPackage(n, User)
+		up, err := c.NewPackageByName(Usr, n)
 
 		if err != nil {
 			continue
@@ -82,7 +72,7 @@ func (c *Config) Update() ([]*Package, error) {
 			return nil, err
 		}
 
-		if sv == uv {
+		if *sv == *uv {
 			continue
 		}
 

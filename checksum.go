@@ -1,13 +1,12 @@
 package king
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
+	"github.com/illiliti/king/internal/chksum"
 	"github.com/illiliti/king/internal/file"
 )
 
@@ -15,39 +14,41 @@ var (
 	ErrIsDir = errors.New("is a directory")
 )
 
-type Checksumer interface {
-	Checksum() (string, error)
+type Checksum interface {
+	Sha256() (string, error)
 	Verify() error
-
-	// TODO
-	// Flush() error
-	// Save() error
 }
 
-func (h *HTTP) Checksum() (string, error) {
-	return file.Sha256Sum(h.Path)
+func (h *HTTP) Sha256() (string, error) {
+	return file.Sha256(h.Path)
 }
 
-func (f *File) Checksum() (string, error) {
-	if f.IsDir {
+func (f *File) Sha256() (string, error) {
+	st, err := os.Stat(f.Path)
+
+	if err != nil {
+		return "", err
+	}
+
+	if st.IsDir() {
 		return "", fmt.Errorf("checksum %s: %w", f.Path, ErrIsDir)
 	}
 
-	return file.Sha256Sum(f.Path)
+	return file.Sha256(f.Path)
 }
 
 func (h *HTTP) Verify() error {
-	x, err := h.Checksum()
+	x, err := h.Sha256()
 
 	if err != nil {
 		return err
 	}
 
-	return verify(h.pkg, x)
+	return verify(h.pkg, h.Path, x)
 }
 
 func (f *File) Verify() error {
-	x, err := f.Checksum()
+	x, err := f.Sha256()
 
 	if err != nil {
 		if errors.Is(err, ErrIsDir) {
@@ -57,34 +58,19 @@ func (f *File) Verify() error {
 		return err
 	}
 
-	return verify(f.pkg, x)
+	return verify(f.pkg, f.Path, x)
 }
 
-func verify(p *Package, x string) error {
-	err := p.checksumsOnce.Do(func() error {
-		f, err := os.Open(filepath.Join(p.Path, "checksums"))
-
-		if err != nil {
-			return err
-		}
-
-		p.checksums = make(map[string]bool)
-		sc := bufio.NewScanner(f)
-
-		for sc.Scan() {
-			p.checksums[strings.Fields(sc.Text())[0]] = true
-		}
-
-		return sc.Err()
-	})
+func verify(p *Package, s, x string) error {
+	c, err := chksum.Open(filepath.Join(p.Path, "checksums"))
 
 	if err != nil {
 		return err
 	}
 
-	if p.checksums[x] {
+	if c.HasEntry(x) {
 		return nil
 	}
 
-	return fmt.Errorf("checksum mismatch: %s", x)
+	return fmt.Errorf("verify %s: mismatch %s", s, x)
 }

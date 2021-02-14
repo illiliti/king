@@ -1,13 +1,11 @@
 package main
 
 import (
-	"bufio"
 	"errors"
-	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/illiliti/king"
+	"github.com/illiliti/king/internal/chksum"
 	"github.com/illiliti/king/internal/log"
 )
 
@@ -17,7 +15,7 @@ func checksum(c *king.Config, args []string) {
 	}
 
 	for _, n := range args {
-		p, err := c.NewPackage(n, king.Any)
+		p, err := c.NewPackageByName(king.Any, n)
 
 		if err != nil {
 			log.Fatal(err)
@@ -26,32 +24,25 @@ func checksum(c *king.Config, args []string) {
 		ss, err := p.Sources()
 
 		if err != nil {
-			continue
+			log.Fatal(err)
 		}
 
-		// TODO move to root ?
-		f, err := os.Create(filepath.Join(p.Path, "checksums"))
+		// log.Runningf("generating checksums %s", p.Name)
+
+		c, err := chksum.Create(filepath.Join(p.Path, "checksums"))
 
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		w := bufio.NewWriter(f)
-
 		for _, s := range ss {
-			if d, ok := s.Protocol.(king.Downloader); ok {
-				if err := d.Download(false); err != nil {
-					log.Fatal(err)
-				}
-			}
-
-			c, ok := s.Protocol.(king.Checksumer)
+			h, ok := s.Protocol.(king.Checksum)
 
 			if !ok {
 				continue
 			}
 
-			x, err := c.Checksum()
+			x, err := h.Sha256()
 
 			if err != nil {
 				if errors.Is(err, king.ErrIsDir) {
@@ -61,15 +52,17 @@ func checksum(c *king.Config, args []string) {
 				log.Fatal(err)
 			}
 
-			fmt.Fprintln(w, x)
+			c.Insert(x)
 		}
 
-		if err := w.Flush(); err != nil {
+		if err := c.Flush(); err != nil {
 			log.Fatal(err)
 		}
 
-		if err := f.Close(); err != nil {
+		if err := c.Close(); err != nil {
 			log.Fatal(err)
 		}
 	}
+
+	// log.Successf("generated checksums %s", strings.Join(args, ", "))
 }

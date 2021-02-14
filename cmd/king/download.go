@@ -1,6 +1,8 @@
 package main
 
 import (
+	"strings"
+
 	"github.com/illiliti/king"
 	"github.com/illiliti/king/internal/log"
 )
@@ -11,7 +13,7 @@ func download(c *king.Config, args []string) {
 	}
 
 	for _, n := range args {
-		p, err := c.NewPackage(n, king.Any)
+		p, err := c.NewPackageByName(king.Any, n)
 
 		if err != nil {
 			log.Fatal(err)
@@ -23,6 +25,8 @@ func download(c *king.Config, args []string) {
 			log.Fatal(err)
 		}
 
+		log.Runningf("downloading %s", p.Name)
+
 		for _, s := range ss {
 			d, ok := s.Protocol.(king.Downloader)
 
@@ -30,9 +34,11 @@ func download(c *king.Config, args []string) {
 				continue
 			}
 
-			if err := d.Download(true); err != nil {
+			if err := d.Download(c.HasForce); err != nil {
 				log.Fatal(err)
 			}
 		}
 	}
+
+	log.Successf("downloaded %s", strings.Join(args, ", "))
 }

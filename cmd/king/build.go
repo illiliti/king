@@ -12,13 +12,18 @@ func build(c *king.Config, args []string) {
 		log.Fatal("not enough arguments")
 	}
 
-	var dpp []*king.Package
+	var (
+		dpp []*king.Package
+		tpp []*king.Tarball
+	)
 
+	mpp := make(map[string]bool)
 	epp := make([]*king.Package, 0, len(args))
 
-	// TODO filter args duplicates ?
+	log.Running("resolving dependencies")
+
 	for _, n := range args {
-		p, err := c.NewPackage(n, king.Any)
+		p, err := c.NewPackageByName(king.Any, n)
 
 		if err != nil {
 			log.Fatal(err)
@@ -26,95 +31,116 @@ func build(c *king.Config, args []string) {
 
 		dd, err := p.RecursiveDepends()
 
-		if err != nil {
+		if err != nil && !os.IsNotExist(err) {
 			log.Fatal(err)
 		}
 
 		for _, d := range dd {
-			if _, err := c.NewPackage(d.Name, king.Sys); err == nil {
+			if mpp[d.Name] {
 				continue
 			}
 
-			p, err := c.NewPackage(d.Name, king.User)
+			if _, err := c.NewPackageByName(king.Sys, d.Name); err == nil {
+				continue
+			}
+
+			p, err := c.NewPackageByName(king.Usr, d.Name)
 
 			if err != nil {
 				log.Fatal(err)
 			}
 
-			dpp = append(dpp, p)
+			t, err := p.Tarball()
+
+			if err != nil {
+				dpp = append(dpp, p)
+			} else {
+				tpp = append(tpp, t)
+			}
+
+			mpp[p.Name] = true
 		}
 
-		epp = append(epp, p)
-	}
-
-	mpp := make(map[string]bool, len(dpp))
-	ipp := make([]*king.Package, 0, len(dpp))
-
-	// TODO redo
-	for _, p := range dpp {
-		if mpp[p.Name] {
-			continue
-		}
-
-		mpp[p.Name] = true
-
-		t, err := c.Tarball(p.Name)
-
-		if err != nil {
-			ipp = append(ipp, p) // TODO redo
-			continue
-		}
-
-		if _, err := t.Install(true); err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	bpp := make([]*king.Package, 0, len(epp))
-
-	for _, p := range epp {
 		if !mpp[p.Name] {
-			bpp = append(bpp, p)
+			mpp[p.Name] = true
+			epp = append(epp, p)
 		}
 	}
 
-	for _, p := range append(ipp, bpp...) {
+	// log.Infof("building %s", strings.Join(ann, ", "))
+	// log.Ask("proceed to build?")
+	// log.Ask("proceed to build? [enter/ctrl+c]")
+	// log.Ask("ready to build %s, press enter to confirm or ctrl+c to abort", strings.Join(..., ", "))
+
+	for _, p := range append(dpp, epp...) {
 		ss, err := p.Sources()
 
 		if err != nil && !os.IsNotExist(err) {
 			log.Fatal(err)
 		}
 
+		log.Runningf("downloading %s", p.Name)
+
 		for _, s := range ss {
-			if d, ok := s.Protocol.(king.Downloader); ok {
-				if err := d.Download(false); err != nil {
-					log.Fatal(err)
-				}
+			d, ok := s.Protocol.(king.Downloader)
+
+			if !ok {
+				continue
 			}
 
-			if v, ok := s.Protocol.(king.Checksumer); ok {
-				if err := v.Verify(); err != nil {
-					log.Fatal(err)
-				}
+			if err := d.Download(false); err != nil {
+				log.Fatal(err)
+			}
+		}
+
+		log.Runningf("verifying %s", p.Name)
+
+		for _, s := range ss {
+			c, ok := s.Protocol.(king.Checksum)
+
+			if !ok {
+				continue
+			}
+
+			if err := c.Verify(); err != nil {
+				log.Fatal(err)
 			}
 		}
 	}
 
-	for _, p := range ipp {
+	// log.Successf("downloaded %s", strings.Join(..., ", "))
+
+	for _, p := range dpp {
+		log.Runningf("building dependency %s", p.Name)
+
 		t, err := p.Build()
 
 		if err != nil {
 			log.Fatal(err)
 		}
 
+		tpp = append(tpp, t)
+	}
+
+	// log.Successf("built %s", strings.Join(..., ", "))
+
+	for _, t := range tpp {
+		log.Runningf("installing dependency %s", t.Name)
+
 		if _, err := t.Install(c.HasForce); err != nil {
 			log.Fatal(err)
 		}
 	}
 
-	for _, p := range bpp {
+	// log.Successf("installed %s", strings.Join(..., ", "))
+
+	for _, p := range epp {
+		log.Runningf("building %s", p.Name)
+
 		if _, err := p.Build(); err != nil {
 			log.Fatal(err)
 		}
 	}
+
+	// log.Successf("built %s", strings.Join(..., ", "))
 }

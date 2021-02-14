@@ -10,10 +10,6 @@ import (
 	"github.com/illiliti/king/internal/file"
 )
 
-type Preparer interface {
-	Prepare(d string) error
-}
-
 func (g *Git) Prepare(d string) error {
 	ctx, cancel := ctxsignal.WithTermination(context.Background())
 	defer cancel()
@@ -65,11 +61,17 @@ func (h *HTTP) Prepare(d string) error {
 		return file.CopyFile(h.Path, d)
 	}
 
-	return file.ExtractArchive(h.Path, d, 1)
+	return file.Unarchive(h.Path, d, 1)
 }
 
 func (f *File) Prepare(d string) error {
-	if f.IsDir {
+	st, err := os.Stat(f.Path)
+
+	if err != nil {
+		return err
+	}
+
+	if st.IsDir() {
 		return file.CopyDir(f.Path, d)
 	}
 
