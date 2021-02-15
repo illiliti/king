@@ -18,6 +18,7 @@ func (p *Package) Build() (*Tarball, error) {
 	pd := filepath.Join(p.cfg.PkgDir, p.Name)
 	bd := filepath.Join(p.cfg.BuildDir, p.Name)
 	pdp := filepath.Join(pd, InstalledDir, p.Name)
+	pdl := filepath.Join(pd, "usr/lib")
 
 	v, err := p.Version()
 
@@ -64,6 +65,22 @@ func (p *Package) Build() (*Tarball, error) {
 
 	if err := cmd.Run(); err != nil {
 		return nil, err
+	}
+
+	dd, err := file.ReadDirNames(pdl)
+
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+
+	for _, n := range dd {
+		if n != "charset.alias" && !strings.HasPrefix(n, ".la") {
+			continue
+		}
+
+		if err := os.Remove(filepath.Join(pdl, n)); err != nil && !os.IsNotExist(err) {
+			return nil, err
+		}
 	}
 
 	if err := file.CopyDir(p.Path, pdp); err != nil {
