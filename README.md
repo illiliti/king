@@ -84,7 +84,7 @@ go build -tags 'osusergo netgo' -ldflags '-s -w'
         * [ ] ensure git support
     * [ ] remove
         * [ ] guard against incomplete removal
-        * [ ] automagically swap dangling alternatives?
+        * [x] automagically swap dangling alternatives
         * [ ] add a way to forcefully remove files in /etc/
     * [ ] source
         * [x] handle https
