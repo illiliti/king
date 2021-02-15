@@ -58,7 +58,6 @@ func (t *Tarball) Install(force bool) (*Package, error) {
 	}
 
 	defer oe.Close()
-
 	defer pathsOnce.Reset()
 	defer dependenciesOnce.Reset()
 

@@ -13,7 +13,7 @@ func install(c *king.Config, args []string) {
 	}
 
 	for _, n := range args {
-		t, err := c.NewTarball(n) // TODO
+		t, err := c.NewTarball(n)
 
 		if err != nil {
 			p, err := c.NewPackageByName(king.Any, n)
