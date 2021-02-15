@@ -1,15 +1,9 @@
 package once
 
-import (
-	"sync/atomic"
-)
-
-type Once struct {
-	c uint32
-}
+type Once bool
 
 func (o *Once) Do(f func() error) error {
-	if atomic.LoadUint32(&o.c) == 1 {
+	if *o {
 		return nil
 	}
 
@@ -17,10 +11,10 @@ func (o *Once) Do(f func() error) error {
 		return err
 	}
 
-	atomic.StoreUint32(&o.c, 1)
+	*o = true
 	return nil
 }
 
 func (o *Once) Reset() {
-	atomic.StoreUint32(&o.c, 0)
+	*o = false
 }
