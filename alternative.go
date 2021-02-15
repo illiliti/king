@@ -68,7 +68,6 @@ func (a *Alternative) Swap() (*Alternative, error) {
 		return nil, err
 	}
 
-	// TODO what we supposed to do if path already removed?
 	cp, err := a.cfg.NewPackageByPath(a.Path)
 
 	if err != nil {
