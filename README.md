@@ -59,7 +59,7 @@ go build -tags 'osusergo netgo' -ldflags '-s -w'
 * library
     * [x] alternative
     * [ ] build
-        * [ ] dynamic dependencies based on ldd-like output
+        * [x] dynamic dependencies based on ldd-like output
         * [ ] strip binaries using pure go (will be implemented as separate project)
         * [ ] remove .la and charset.alias
         * [ ] logging to file and stdout

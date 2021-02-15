@@ -1,9 +1,13 @@
 package king
 
 import (
+	"bufio"
+	"debug/elf"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/illiliti/king/internal/etcsum"
 	"github.com/illiliti/king/internal/file"
@@ -62,13 +66,18 @@ func (p *Package) Build() (*Tarball, error) {
 		return nil, err
 	}
 
-	// TODO remove ".la" and "charset.alias"
-	// TODO stripBinaries (strip)
-	// TODO correctDepends (ldd)
-
 	if err := file.CopyDir(p.Path, pdp); err != nil {
 		return nil, err
 	}
+
+	if err := updateDepends(p, pd, pdp); err != nil {
+		return nil, err
+	}
+
+	// TODO strip binaries
+	// if err := stripBinaries(pd); err != nil {
+	// 	return nil, err
+	// }
 
 	if st, err := os.Stat(filepath.Join(pd, "etc")); err == nil && st.IsDir() {
 		e, err := etcsum.Create(filepath.Join(pdp, "etcsums"))
@@ -120,4 +129,96 @@ func (p *Package) Build() (*Tarball, error) {
 	}
 
 	return t, file.Archive(pd, t.Path)
+}
+
+func updateDepends(bp *Package, pd, pdp string) error {
+	mdd := make(map[string]bool)
+
+	err := filepath.Walk(pd, func(p string, st os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !st.Mode().IsRegular() {
+			return nil
+		}
+
+		f, err := elf.Open(p)
+
+		if err != nil {
+			return nil
+		}
+
+		ll, err := f.ImportedLibraries()
+
+		if err != nil {
+			return nil
+		}
+
+		for _, l := range ll {
+			p, err := bp.cfg.NewPackageByPath(filepath.Join("/usr/lib", l))
+
+			if err != nil {
+				continue
+			}
+
+			if p.Name == bp.Name {
+				continue
+			}
+
+			if !mdd[p.Name] {
+				mdd[p.Name] = true
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	if len(mdd) == 0 {
+		return nil
+	}
+
+	f, err := os.OpenFile(filepath.Join(pdp, "depends"), os.O_CREATE|os.O_RDWR, 0666)
+
+	if err != nil {
+		return err
+	}
+
+	sc := bufio.NewScanner(f)
+
+	for sc.Scan() {
+		d := strings.Fields(sc.Text())[0]
+
+		if !mdd[d] {
+			mdd[d] = true
+		}
+	}
+
+	if err := sc.Err(); err != nil {
+		return err
+	}
+
+	if err := f.Truncate(0); err != nil {
+		return err
+	}
+
+	if _, err := f.Seek(0, 0); err != nil {
+		return err
+	}
+
+	w := bufio.NewWriter(f)
+
+	for n := range mdd {
+		fmt.Fprintln(w, n)
+	}
+
+	if err := w.Flush(); err != nil {
+		return err
+	}
+
+	return f.Close()
 }
