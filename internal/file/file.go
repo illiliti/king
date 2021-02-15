@@ -180,7 +180,7 @@ func Unarchive(s, d string, c int) error {
 	u, ok := f.(archiver.Unarchiver)
 
 	if !ok {
-		return fmt.Errorf("archive %s: cannot be extracted", f)
+		return fmt.Errorf("archive %s: unextractable format", f)
 	}
 
 	return u.Unarchive(s, d)
