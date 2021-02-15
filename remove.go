@@ -34,29 +34,32 @@ func (p *Package) Remove(force bool) error {
 	}
 
 	defer oe.Close()
-
 	defer pathsOnce.Reset()
 	defer dependenciesOnce.Reset()
 
 	signal.Ignore(os.Interrupt)
 	defer signal.Reset(os.Interrupt)
 
-	// TODO automagically swap dangling alternatives
-	// for _, r := range om.Remove() {
-	// 	a, err := p.cfg.NewAlternativeByPath(r)
+	for _, r := range om.Remove() {
+		oa, err := p.cfg.NewAlternativeByPath(r)
 
-	// 	if err != nil {
-	// 		continue
-	// 	}
+		if err != nil {
+			continue
+		}
 
-	// 	if a.Name == p.Name {
-	// 		continue
-	// 	}
+		if oa.Name == p.Name {
+			continue
+		}
 
-	// 	if _, err := a.Swap(); err != nil {
-	// 		return err
-	// 	}
-	// }
+		na, err := oa.Swap()
+
+		if err != nil {
+			return err
+		}
+
+		om.Insert(ChoicesDir)
+		om.Replace(na.Path, filepath.Join(ChoicesDir, na.Name+strings.ReplaceAll(na.Path, "/", ">")))
+	}
 
 	for _, r := range om.Remove() {
 		rp := filepath.Join(p.cfg.RootDir, r)
