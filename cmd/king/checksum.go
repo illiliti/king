@@ -27,6 +27,19 @@ func checksum(c *king.Config, args []string) {
 			log.Fatal(err)
 		}
 
+		hh := make([]king.Checksum, 0, len(ss))
+
+		for _, s := range ss {
+			if h, ok := s.Protocol.(king.Checksum); ok {
+				hh = append(hh, h)
+			}
+		}
+
+		if len(hh) == 0 {
+			// log.Infof("... %s", p.Name)
+			continue
+		}
+
 		// log.Runningf("generating checksums %s", p.Name)
 
 		c, err := chksum.Create(filepath.Join(p.Path, "checksums"))
@@ -35,13 +48,7 @@ func checksum(c *king.Config, args []string) {
 			log.Fatal(err)
 		}
 
-		for _, s := range ss {
-			h, ok := s.Protocol.(king.Checksum)
-
-			if !ok {
-				continue
-			}
-
+		for _, h := range hh {
 			x, err := h.Sha256()
 
 			if err != nil {
