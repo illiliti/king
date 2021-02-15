@@ -72,7 +72,7 @@ go build -tags 'osusergo netgo' -ldflags '-s -w'
         * [ ] rename essential directories
         * [ ] use system directory for sources/binaries?
     * [ ] dependency
-        * [ ] guard against cyclic dependencies
+        * [ ] guard against circular dependencies
     * [ ] download
         * [ ] progress bar
         * [ ] drop ctxsignal
@@ -85,6 +85,7 @@ go build -tags 'osusergo netgo' -ldflags '-s -w'
     * [ ] remove
         * [ ] guard against incomplete removal
         * [ ] automagically swap dangling alternatives?
+        * [ ] add a way to forcefully remove files in /etc/
     * [ ] source
         * [x] handle https
         * [ ] handle git (need to recheck)
