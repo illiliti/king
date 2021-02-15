@@ -48,7 +48,7 @@ go build -tags 'osusergo netgo' -ldflags '-s -w'
         * [ ] ask confirmation about building
         * [ ] add a way to skip checksum verification
     * [ ] checksum
-        * [ ] fix empty checksums file if sources file only contains git source
+        * [x] fix empty checksums file if sources file only contains git source
         * [ ] rewrite logging messages
     * [x] download
     * [x] install
