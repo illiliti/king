@@ -55,7 +55,7 @@ go build -tags 'osusergo netgo' -ldflags '-s -w'
     * [x] list
     * [x] remove
     * [x] search
-    * [ ] update
+    * [x] update
 * library
     * [x] alternative
     * [ ] build
@@ -66,7 +66,6 @@ go build -tags 'osusergo netgo' -ldflags '-s -w'
         * [ ] add a way to resume build
         * [ ] handle ctrl+c
     * [x] checksum
-        * [ ] solve inconsistent mess between checksum.go and internal/chksum/chksum.go
     * [ ] config
         * [ ] file-based config?
         * [ ] rename essential directories
