@@ -173,6 +173,17 @@ func updateDepends(bp *Package, pd, pdp string) error {
 		}
 
 		for _, l := range ll {
+			i := strings.Index(l, ".")
+
+			if i < 0 {
+				continue
+			}
+
+			switch l[3:i] {
+			case "c", "m", "dl", "rt", "xnet", "util", "trace", "crypt", "pthread", "resolv":
+				continue
+			}
+
 			p, err := bp.cfg.NewPackageByPath(filepath.Join("/usr/lib", l))
 
 			if err != nil {
