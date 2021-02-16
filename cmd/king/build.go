@@ -1,7 +1,8 @@
 package main
 
 import (
-	"os"
+	"errors"
+	"io/fs"
 
 	"github.com/illiliti/king"
 	"github.com/illiliti/king/internal/log"
@@ -31,7 +32,7 @@ func build(c *king.Config, args []string) {
 
 		dd, err := p.RecursiveDepends()
 
-		if err != nil && !os.IsNotExist(err) {
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			log.Fatal(err)
 		}
 
@@ -75,7 +76,7 @@ func build(c *king.Config, args []string) {
 	for _, p := range append(dpp, epp...) {
 		ss, err := p.Sources()
 
-		if err != nil && !os.IsNotExist(err) {
+		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			log.Fatal(err)
 		}
 

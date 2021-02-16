@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/illiliti/king/internal/file"
 	"github.com/illiliti/king/internal/manifest"
 )
 
@@ -19,7 +18,7 @@ type Alternative struct {
 }
 
 func (c *Config) NewAlternativeByPath(p string) (*Alternative, error) {
-	dd, err := file.ReadDirNames(filepath.Join(c.RootDir, ChoicesDir))
+	dd, err := os.ReadDir(filepath.Join(c.RootDir, ChoicesDir))
 
 	if err != nil {
 		return nil, err
@@ -27,13 +26,13 @@ func (c *Config) NewAlternativeByPath(p string) (*Alternative, error) {
 
 	s := strings.ReplaceAll(p, "/", ">")
 
-	for _, n := range dd {
-		if !strings.HasSuffix(n, s) {
+	for _, de := range dd {
+		if !strings.HasSuffix(de.Name(), s) {
 			continue
 		}
 
 		return &Alternative{
-			Name: strings.TrimSuffix(n, s),
+			Name: strings.TrimSuffix(de.Name(), s),
 			Path: p,
 			cfg:  c,
 		}, nil

@@ -4,7 +4,7 @@ Next generation of the KISS package manager
 **Unstable, not intended for daily usage**
 
 ## Dependencies
-* Go >= 1.15 (build time)
+* Go >= 1.16 (build time)
 
 ## Installation
 ```sh
@@ -75,7 +75,7 @@ go build -tags 'osusergo netgo' -ldflags '-s -w'
         * [ ] guard against circular dependencies
     * [ ] download
         * [ ] progress bar
-        * [ ] drop ctxsignal
+        * [x] drop ctxsignal
     * [ ] install
         * [ ] guard against incomplete installation
         * [ ] ensure that /etc/ handling is working correctly

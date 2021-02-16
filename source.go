@@ -2,7 +2,9 @@ package king
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"io/fs"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -125,7 +127,7 @@ func newFile(p *Package, s string) (*File, error) {
 		filepath.Join(p.cfg.RootDir, s),
 	} {
 		if _, err := os.Stat(s); err != nil {
-			if os.IsNotExist(err) {
+			if errors.Is(err, fs.ErrNotExist) {
 				continue
 			}
 

@@ -2,7 +2,10 @@ package king
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -45,7 +48,7 @@ func (t *Tarball) Install(force bool) (*Package, error) {
 
 	om, err := manifest.Open(filepath.Join(pdp, "manifest"))
 
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, err
 	}
 
@@ -53,7 +56,7 @@ func (t *Tarball) Install(force bool) (*Package, error) {
 
 	oe, err := etcsum.Open(filepath.Join(pdp, "etcsums"))
 
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, err
 	}
 
@@ -117,7 +120,7 @@ func (t *Tarball) Install(force bool) (*Package, error) {
 			}
 
 			err = os.Chmod(rp, st.Mode()) // TODO
-		case st.Mode()&os.ModeSymlink != 0:
+		case st.Mode()&fs.ModeSymlink != 0:
 			err = file.CopySymlink(dp, rp)
 		case st.Mode().IsRegular():
 			if strings.HasPrefix(i, "/etc/") {
@@ -131,7 +134,7 @@ func (t *Tarball) Install(force bool) (*Package, error) {
 
 				// TODO document and recheck https://k1ss.org/package-manager#3.3
 				switch {
-				case os.IsNotExist(err):
+				case errors.Is(err, fs.ErrNotExist):
 					//
 				case err != nil:
 					return nil, err
@@ -164,7 +167,7 @@ func (t *Tarball) Install(force bool) (*Package, error) {
 		rp := filepath.Join(t.cfg.RootDir, r)
 		st, err := os.Lstat(rp)
 
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
 
@@ -184,13 +187,19 @@ func (t *Tarball) Install(force bool) (*Package, error) {
 				continue
 			}
 		case st.IsDir():
-			dd, err := file.ReadDirNames(rp)
+			f, err := os.Open(rp)
 
 			if err != nil {
 				return nil, err
 			}
 
-			if len(dd) > 0 {
+			_, err = f.ReadDir(1)
+
+			if err := f.Close(); err != nil {
+				return nil, err
+			}
+
+			if !errors.Is(err, io.EOF) {
 				continue
 			}
 		}
@@ -212,7 +221,7 @@ func (t *Tarball) Install(force bool) (*Package, error) {
 func unmetDependencies(t *Tarball, d string) error {
 	f, err := os.Open(d)
 
-	if os.IsNotExist(err) {
+	if errors.Is(err, fs.ErrNotExist) {
 		return nil
 	}
 

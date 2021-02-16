@@ -3,17 +3,16 @@ package king
 import (
 	"context"
 	"os"
+	"os/signal"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/henvic/ctxsignal"
-	"github.com/illiliti/king/internal/file"
 )
 
 // TODO intergrate 'kiss-outdated' functionality
 
 func (c *Config) Update() ([]*Package, error) {
-	ctx, cancel := ctxsignal.WithTermination(context.Background())
-	defer cancel()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
 
 	for _, db := range c.UserDB {
 		r, err := git.PlainOpenWithOptions(db, &git.PlainOpenOptions{
@@ -38,7 +37,7 @@ func (c *Config) Update() ([]*Package, error) {
 		}
 	}
 
-	dd, err := file.ReadDirNames(c.SysDB)
+	dd, err := os.ReadDir(c.SysDB)
 
 	if err != nil {
 		return nil, err
@@ -47,8 +46,8 @@ func (c *Config) Update() ([]*Package, error) {
 	pp := make([]*Package, 0, len(dd))
 
 	// TODO concurrency
-	for _, n := range dd {
-		sp, err := c.NewPackageByName(Sys, n)
+	for _, de := range dd {
+		sp, err := c.NewPackageByName(Sys, de.Name())
 
 		if err != nil {
 			return nil, err
@@ -60,7 +59,7 @@ func (c *Config) Update() ([]*Package, error) {
 			return nil, err
 		}
 
-		up, err := c.NewPackageByName(Usr, n)
+		up, err := c.NewPackageByName(Usr, de.Name())
 
 		if err != nil {
 			continue

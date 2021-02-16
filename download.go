@@ -2,13 +2,14 @@ package king
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
-
-	"github.com/henvic/ctxsignal" // TODO github.com/golang/go/issues/37255
 )
 
 type Downloader interface {
@@ -17,12 +18,12 @@ type Downloader interface {
 
 // TODO progress bar
 func (h *HTTP) Download(force bool) error {
-	if _, err := os.Stat(h.Path); !force && !os.IsNotExist(err) {
+	if _, err := os.Stat(h.Path); !force && !errors.Is(err, fs.ErrNotExist) {
 		return nil
 	}
 
-	ctx, cancel := ctxsignal.WithTermination(context.Background())
-	defer cancel()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
 
 	rq, err := http.NewRequestWithContext(ctx, http.MethodGet, h.URL, nil)
 

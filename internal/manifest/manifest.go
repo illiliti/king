@@ -3,6 +3,7 @@ package manifest
 import (
 	"bufio"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -65,7 +66,7 @@ func (m *Manifest) HasEntry(e string) bool {
 func (m *Manifest) Generate(d string) error {
 	m.pp = make([]string, 0, len(m.pp))
 
-	return filepath.Walk(d, func(p string, st os.FileInfo, err error) error {
+	return filepath.WalkDir(d, func(p string, de fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -76,7 +77,7 @@ func (m *Manifest) Generate(d string) error {
 			return nil
 		}
 
-		if st.IsDir() {
+		if de.IsDir() {
 			p += "/"
 		}
 

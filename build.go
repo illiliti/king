@@ -3,7 +3,9 @@ package king
 import (
 	"bufio"
 	"debug/elf"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,7 +30,7 @@ func (p *Package) Build() (*Tarball, error) {
 
 	ss, err := p.Sources()
 
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, err
 	}
 
@@ -67,18 +69,18 @@ func (p *Package) Build() (*Tarball, error) {
 		return nil, err
 	}
 
-	dd, err := file.ReadDirNames(pdl)
+	dd, err := os.ReadDir(pdl)
 
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, err
 	}
 
-	for _, n := range dd {
-		if n != "charset.alias" && !strings.HasPrefix(n, ".la") {
+	for _, de := range dd {
+		if de.Name() != "charset.alias" && filepath.Ext(de.Name()) != ".la" {
 			continue
 		}
 
-		if err := os.Remove(filepath.Join(pdl, n)); err != nil && !os.IsNotExist(err) {
+		if err := os.Remove(filepath.Join(pdl, de.Name())); err != nil {
 			return nil, err
 		}
 	}
@@ -141,7 +143,7 @@ func (p *Package) Build() (*Tarball, error) {
 		cfg: p.cfg,
 	}
 
-	if err := os.Remove(t.Path); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(t.Path); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, err
 	}
 
@@ -151,12 +153,12 @@ func (p *Package) Build() (*Tarball, error) {
 func updateDepends(bp *Package, pd, pdp string) error {
 	mdd := make(map[string]bool)
 
-	err := filepath.Walk(pd, func(p string, st os.FileInfo, err error) error {
+	err := filepath.WalkDir(pd, func(p string, de fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if !st.Mode().IsRegular() {
+		if !de.Type().IsRegular() {
 			return nil
 		}
 

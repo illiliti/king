@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/illiliti/king"
-	"github.com/illiliti/king/internal/file"
 	"github.com/illiliti/king/internal/log"
 )
 
@@ -19,7 +18,15 @@ func list(c *king.Config, args []string) {
 			return args
 		}
 
-		dd, err := file.ReadDirNames(c.SysDB)
+		f, err := os.Open(c.SysDB)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		defer f.Close()
+
+		dd, err := f.Readdirnames(0)
 
 		if err != nil {
 			log.Fatal(err)

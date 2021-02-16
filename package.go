@@ -2,12 +2,13 @@ package king
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/illiliti/king/internal/file"
 	"github.com/illiliti/king/internal/once"
 )
 
@@ -38,7 +39,7 @@ func (c *Config) NewPackageByName(t PackageType, n string) (*Package, error) {
 			p := filepath.Join(db, n)
 			st, err := os.Stat(p)
 
-			if os.IsNotExist(err) {
+			if errors.Is(err, fs.ErrNotExist) {
 				continue
 			}
 
@@ -108,7 +109,7 @@ func (c *Config) NewPackageByPath(p string) (*Package, error) {
 			return sc.Err()
 		}
 
-		dd, err := file.ReadDirNames(c.SysDB)
+		dd, err := os.ReadDir(c.SysDB)
 
 		if err != nil {
 			return err
@@ -116,8 +117,8 @@ func (c *Config) NewPackageByPath(p string) (*Package, error) {
 
 		paths = make(map[string]*Package)
 
-		for _, n := range dd {
-			if err := add(n); err != nil {
+		for _, de := range dd {
+			if err := add(de.Name()); err != nil {
 				return err
 			}
 		}

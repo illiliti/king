@@ -3,12 +3,12 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/illiliti/king"
-	"github.com/illiliti/king/internal/file"
 	"github.com/illiliti/king/internal/log"
 )
 
@@ -19,8 +19,8 @@ func alternative(c *king.Config, args []string) {
 		log.Fatal(err)
 	}
 
-	if len(args) == 0 && st.Mode()&os.ModeCharDevice != 0 {
-		dd, err := file.ReadDirNames(filepath.Join(c.RootDir, king.ChoicesDir))
+	if len(args) == 0 && st.Mode()&fs.ModeCharDevice != 0 {
+		dd, err := os.ReadDir(filepath.Join(c.RootDir, king.ChoicesDir))
 
 		if err != nil {
 			log.Fatal(err)
@@ -29,14 +29,14 @@ func alternative(c *king.Config, args []string) {
 		w := bufio.NewWriter(os.Stdout)
 		defer w.Flush()
 
-		for _, n := range dd {
-			i := strings.Index(n, ">")
+		for _, de := range dd {
+			i := strings.Index(de.Name(), ">")
 
 			if i < 0 {
 				continue
 			}
 
-			fmt.Fprintln(w, n[:i], strings.ReplaceAll(n[i:], ">", "/"))
+			fmt.Fprintln(w, de.Name()[:i], strings.ReplaceAll(de.Name()[i:], ">", "/"))
 		}
 
 		return

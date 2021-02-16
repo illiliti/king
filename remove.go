@@ -1,7 +1,10 @@
 package king
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -21,7 +24,7 @@ func (p *Package) Remove(force bool) error {
 
 	om, err := manifest.Open(filepath.Join(p.Path, "manifest"))
 
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
 
@@ -29,7 +32,7 @@ func (p *Package) Remove(force bool) error {
 
 	oe, err := etcsum.Open(filepath.Join(p.Path, "etcsums"))
 
-	if err != nil && !os.IsNotExist(err) {
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
 
@@ -65,7 +68,7 @@ func (p *Package) Remove(force bool) error {
 		rp := filepath.Join(p.cfg.RootDir, r)
 		st, err := os.Lstat(rp)
 
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
 
@@ -85,13 +88,19 @@ func (p *Package) Remove(force bool) error {
 				continue
 			}
 		case st.IsDir():
-			dd, err := file.ReadDirNames(rp)
+			f, err := os.Open(rp)
 
 			if err != nil {
 				return err
 			}
 
-			if len(dd) > 0 {
+			_, err = f.ReadDir(1)
+
+			if err := f.Close(); err != nil {
+				return err
+			}
+
+			if !errors.Is(err, io.EOF) {
 				continue
 			}
 		}

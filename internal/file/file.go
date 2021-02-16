@@ -3,27 +3,16 @@ package file
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/mholt/archiver/v3"
 )
-
-// TODO rename file.go to fs.go ?
-
-func ReadDirNames(d string) ([]string, error) {
-	f, err := os.Open(d)
-
-	if err != nil {
-		return nil, err
-	}
-
-	defer f.Close()
-	return f.Readdirnames(0)
-}
 
 func Sha256(p string) (string, error) {
 	f, err := os.Open(p)
@@ -50,7 +39,7 @@ func CopySymlink(s, d string) error {
 		return err
 	}
 
-	if err := os.Remove(d); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(d); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
 
@@ -72,7 +61,7 @@ func CopyFile(s, d string) error {
 		return err
 	}
 
-	if err := os.Remove(d); err != nil && !os.IsNotExist(err) {
+	if err := os.Remove(d); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
 
@@ -102,27 +91,33 @@ func CopyFile(s, d string) error {
 }
 
 func CopyDir(s, d string) error {
-	return filepath.Walk(s, func(p string, st os.FileInfo, err error) error {
+	return filepath.WalkDir(s, func(p string, de fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
 		dp := filepath.Join(d, strings.TrimPrefix(p, s))
 
-		switch m := st.Mode(); {
-		case m.IsDir():
+		switch {
+		case de.IsDir():
 			if err := os.MkdirAll(dp, 0777); err != nil {
 				return err
 			}
 
-			return os.Chmod(dp, m)
-		case m.IsRegular():
-			return CopyFile(p, dp)
-		case m&os.ModeSymlink != 0:
-			return CopySymlink(p, dp)
+			st, err := de.Info()
+
+			if err != nil {
+				return err
+			}
+
+			err = os.Chmod(dp, st.Mode())
+		case de.Type().IsRegular():
+			err = CopyFile(p, dp)
+		case de.Type()&fs.ModeSymlink != 0:
+			err = CopySymlink(p, dp)
 		}
 
-		return nil
+		return err
 	})
 }
 

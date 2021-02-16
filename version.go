@@ -2,7 +2,7 @@ package king
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -14,7 +14,7 @@ type Version struct {
 }
 
 func (p *Package) Version() (*Version, error) {
-	b, err := ioutil.ReadFile(filepath.Join(p.Path, "version"))
+	b, err := os.ReadFile(filepath.Join(p.Path, "version"))
 
 	if err != nil {
 		return nil, err

@@ -2,11 +2,12 @@ package king
 
 import (
 	"bufio"
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/illiliti/king/internal/file"
 	"github.com/illiliti/king/internal/once"
 )
 
@@ -50,7 +51,6 @@ func (p *Package) Depends() ([]*Dependency, error) {
 	return dd, sc.Err()
 }
 
-// TODO protect against cyclic dependencies
 func (p *Package) RecursiveDepends() ([]*Dependency, error) {
 	dd, err := p.Depends()
 
@@ -67,7 +67,7 @@ func (p *Package) RecursiveDepends() ([]*Dependency, error) {
 
 		rdd, err := rp.RecursiveDepends()
 
-		if os.IsNotExist(err) {
+		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
 
@@ -84,7 +84,7 @@ func (p *Package) RecursiveDepends() ([]*Dependency, error) {
 // TODO allow UserDB ?
 func (p *Package) ReverseDepends() ([]string, error) {
 	err := dependenciesOnce.Do(func() error {
-		dd, err := file.ReadDirNames(p.cfg.SysDB)
+		dd, err := os.ReadDir(p.cfg.SysDB)
 
 		if err != nil {
 			return err
@@ -92,8 +92,8 @@ func (p *Package) ReverseDepends() ([]string, error) {
 
 		dependencies = make(map[string][]string, len(dd))
 
-		for _, n := range dd {
-			sp, err := p.cfg.NewPackageByName(Sys, n)
+		for _, de := range dd {
+			sp, err := p.cfg.NewPackageByName(Sys, de.Name())
 
 			if err != nil {
 				return err
@@ -101,7 +101,7 @@ func (p *Package) ReverseDepends() ([]string, error) {
 
 			dd, err := sp.Depends()
 
-			if os.IsNotExist(err) {
+			if errors.Is(err, fs.ErrNotExist) {
 				continue
 			}
 

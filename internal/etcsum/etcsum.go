@@ -3,6 +3,7 @@ package etcsum
 import (
 	"bufio"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -53,12 +54,12 @@ func (e *Etcsum) HasEntry(x string) bool {
 func (e *Etcsum) Generate(d string) error {
 	e.ee = make(map[string]bool, len(e.ee))
 
-	return filepath.Walk(d, func(p string, st os.FileInfo, err error) error {
+	return filepath.WalkDir(d, func(p string, de fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		if !st.Mode().IsRegular() {
+		if !de.Type().IsRegular() {
 			return nil
 		}
 

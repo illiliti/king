@@ -3,15 +3,15 @@ package king
 import (
 	"context"
 	"os"
+	"os/signal"
 
 	"github.com/go-git/go-git/v5"
-	"github.com/henvic/ctxsignal"
 	"github.com/illiliti/king/internal/file"
 )
 
 func (g *Git) Prepare(d string) error {
-	ctx, cancel := ctxsignal.WithTermination(context.Background())
-	defer cancel()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
 
 	_, err := git.PlainCloneContext(ctx, d, false, &git.CloneOptions{
 		URL:          g.URL,
