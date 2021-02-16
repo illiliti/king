@@ -81,14 +81,17 @@ go build -tags 'osusergo netgo' -ldflags '-s -w'
         * [ ] ensure that /etc/ handling is working correctly
     * [x] package
     * [ ] prepare
-        * [ ] ensure git support
+        * [ ] git clone commit/branch
+        * [ ] progress bar for git cloning
     * [ ] remove
         * [ ] guard against incomplete removal
         * [x] automagically swap dangling alternatives
         * [ ] add a way to forcefully remove files in /etc/
     * [ ] source
         * [x] handle https
-        * [ ] handle git (need to recheck)
+        * [ ] handle git
+            * [ ] commit
+            * [ ] branch
         * [x] handle absolute/relative files
     * [x] tarball
     * [ ] update
