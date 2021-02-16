@@ -7,8 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/go-git/go-git/v5/config"
 )
 
 // TODO Source as interface ?
@@ -29,8 +27,7 @@ type Source struct {
 }
 
 type Git struct {
-	URL     string
-	RefSpec config.RefSpec
+	URL string
 }
 
 type HTTP struct {
@@ -75,7 +72,7 @@ func (p *Package) Sources() ([]*Source, error) {
 
 		switch {
 		case strings.HasPrefix(fi[0], "git+"):
-			s.Protocol = newGit(strings.TrimPrefix(fi[0], "git+"))
+			s.Protocol, err = newGit(strings.TrimPrefix(fi[0], "git+"))
 		case strings.Contains(fi[0], "://"):
 			s.Protocol, err = newHTTP(p, fi[0], s.DestinationDir)
 		default:
@@ -92,28 +89,17 @@ func (p *Package) Sources() ([]*Source, error) {
 	return ss, sc.Err()
 }
 
-func newGit(s string) *Git {
-	if i := strings.LastIndexAny(s, "#@"); i > 0 {
-		switch s[i:][0] {
-		case '#':
-			return &Git{
-				URL:     s[:i],
-				RefSpec: config.RefSpec(s[i+1:] + ":refs/remotes/origin/master"),
-			}
-		case '@':
-			return &Git{
-				URL:     s[:i],
-				RefSpec: config.RefSpec("refs/heads/" + s[i+1:] + ":refs/remotes/origin/" + s[i+1:]),
-			}
-		}
+func newGit(s string) (*Git, error) {
+	if strings.ContainsAny(s, "@#") {
+		return nil, fmt.Errorf("source %s: unsupported branch/commit")
 	}
 
 	return &Git{
-		URL:     s,
-		RefSpec: config.RefSpec("refs/heads/master:refs/remotes/origin/master"),
-	}
+		URL: s,
+	}, nil
 }
 
+// TODO newFile if source has no-extract
 func newHTTP(p *Package, s, d string) (*HTTP, error) {
 	u, err := url.Parse(s)
 
