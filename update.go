@@ -8,9 +8,17 @@ import (
 	"github.com/go-git/go-git/v5"
 )
 
-// TODO intergrate 'kiss-outdated' functionality
+// Candidate represents candidate for upgrading.
+type Candidate struct {
+	Name string
+}
 
-func (c *Config) Update() ([]*Package, error) {
+// Update updates repositories, interates over SysDB and returns non-empty
+// slice of Candidate pointers if at least one installed package version differs
+// to version available in repositories.
+//
+// TODO intergrate "kiss-outdated" functionality
+func Update(c *Config) ([]*Candidate, error) {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
@@ -43,11 +51,11 @@ func (c *Config) Update() ([]*Package, error) {
 		return nil, err
 	}
 
-	pp := make([]*Package, 0, len(dd))
+	cc := make([]*Candidate, 0, len(dd))
 
-	// TODO concurrency
+	// TODO parallelism
 	for _, de := range dd {
-		sp, err := c.NewPackageByName(Sys, de.Name())
+		sp, err := NewPackageByName(c, Sys, de.Name())
 
 		if err != nil {
 			return nil, err
@@ -59,7 +67,7 @@ func (c *Config) Update() ([]*Package, error) {
 			return nil, err
 		}
 
-		up, err := c.NewPackageByName(Usr, de.Name())
+		up, err := NewPackageByName(c, Usr, de.Name())
 
 		if err != nil {
 			continue
@@ -75,8 +83,14 @@ func (c *Config) Update() ([]*Package, error) {
 			continue
 		}
 
-		pp = append(pp, up)
+		cc = append(cc, &Candidate{
+			Name: up.Name,
+		})
 	}
 
-	return pp, nil
+	return cc, nil
+}
+
+func (c *Candidate) String() string {
+	return c.Name
 }

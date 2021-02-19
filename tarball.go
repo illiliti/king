@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-// TODO String() ?
+// Tarball represents location to installable binary package.
 type Tarball struct {
 	Name string
 	Path string
@@ -15,6 +15,7 @@ type Tarball struct {
 	cfg *Config
 }
 
+// Tarball returns a pointer to Tarball for a given package.
 func (p *Package) Tarball() (*Tarball, error) {
 	v, err := p.Version()
 
@@ -40,7 +41,8 @@ func (p *Package) Tarball() (*Tarball, error) {
 	}, nil
 }
 
-func (c *Config) NewTarball(p string) (*Tarball, error) {
+// NewTarball returns a pointer to Tarball for a given path.
+func NewTarball(c *Config, p string) (*Tarball, error) {
 	st, err := os.Stat(p)
 
 	if err != nil {

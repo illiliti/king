@@ -7,8 +7,6 @@ import (
 	"strings"
 )
 
-// TODO rename Chksum to ... ?
-
 type Chksum struct {
 	f  *os.File
 	cc map[string]bool

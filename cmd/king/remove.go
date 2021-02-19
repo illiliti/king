@@ -1,8 +1,6 @@
 package main
 
 import (
-	"strings"
-
 	"github.com/illiliti/king"
 	"github.com/illiliti/king/internal/log"
 )
@@ -13,7 +11,7 @@ func remove(c *king.Config, args []string) {
 	}
 
 	for _, n := range args {
-		p, err := c.NewPackageByName(king.Sys, n)
+		p, err := king.NewPackageByName(c, king.Sys, n)
 
 		if err != nil {
 			log.Fatal(err)
@@ -26,5 +24,5 @@ func remove(c *king.Config, args []string) {
 		}
 	}
 
-	log.Successf("removed %s", strings.Join(args, ", "))
+	log.Infof("removed %s", args)
 }

@@ -16,6 +16,11 @@ import (
 	"github.com/illiliti/king/internal/manifest"
 )
 
+// Install installs given package to the system.
+//
+// If force equal false, Install checks if packages declared in
+// depends file (if exists) are installed and returns error if not.
+// Otherwise, this check is entirely skipped.
 func (t *Tarball) Install(force bool) (*Package, error) {
 	ed := filepath.Join(t.cfg.ExtractDir, t.Name)
 	edp := filepath.Join(ed, InstalledDir, t.Name)
@@ -34,10 +39,12 @@ func (t *Tarball) Install(force bool) (*Package, error) {
 		return nil, err
 	}
 
-	err := unmetDependencies(t, filepath.Join(edp, "depends"))
+	if !force {
+		err := unmetDependencies(t, filepath.Join(edp, "depends"))
 
-	if !force && err != nil {
-		return nil, err
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	nm, err := manifest.Open(filepath.Join(edp, "manifest"))
@@ -61,12 +68,10 @@ func (t *Tarball) Install(force bool) (*Package, error) {
 	}
 
 	defer oe.Close()
-	defer pathsOnce.Reset()
-	defer dependenciesOnce.Reset()
 
 	// TODO resolve directory symlinks ?
 	for _, i := range nm.Install() {
-		sp, err := t.cfg.NewPackageByPath(i)
+		sp, err := NewPackageByPath(t.cfg, i)
 
 		if err != nil {
 			continue
@@ -99,6 +104,9 @@ func (t *Tarball) Install(force bool) (*Package, error) {
 		return nil, err
 	}
 
+	defer pathsOnce.Reset()
+	defer dependenciesOnce.Reset()
+
 	signal.Ignore(os.Interrupt)
 	defer signal.Reset(os.Interrupt)
 
@@ -113,48 +121,48 @@ func (t *Tarball) Install(force bool) (*Package, error) {
 			return nil, err
 		}
 
-		switch {
-		case st.IsDir():
-			if err := os.MkdirAll(rp, 0); err != nil {
+		if strings.HasPrefix(i, "/etc/") && !strings.HasSuffix(i, "/") {
+			dx, err := file.Sha256(dp)
+
+			if err != nil {
 				return nil, err
 			}
 
-			err = os.Chmod(rp, st.Mode()) // TODO
+			rx, err := file.Sha256(rp)
+
+			// TODO document and recheck https://kiss.armaanb.net/package-manager#3.3
+			switch {
+			case errors.Is(err, fs.ErrNotExist):
+				//
+			case err != nil:
+				return nil, err
+			case rx == dx:
+				//
+			case !oe.HasEntry(rx) && oe.HasEntry(dx):
+				continue
+			case oe.HasEntry(rx) && !oe.HasEntry(dx):
+				//
+			default:
+				rp += ".new"
+			}
+		}
+
+		switch {
+		case st.IsDir():
+			err = os.MkdirAll(rp, 0)
+		case st.Mode().IsRegular():
+			err = file.CopyFile(dp, rp)
 		case st.Mode()&fs.ModeSymlink != 0:
 			err = file.CopySymlink(dp, rp)
-		case st.Mode().IsRegular():
-			if strings.HasPrefix(i, "/etc/") {
-				dx, err := file.Sha256(dp)
-
-				if err != nil {
-					return nil, err
-				}
-
-				rx, err := file.Sha256(rp)
-
-				// TODO document and recheck https://k1ss.org/package-manager#3.3
-				switch {
-				case errors.Is(err, fs.ErrNotExist):
-					//
-				case err != nil:
-					return nil, err
-				case rx == dx:
-					//
-				case !oe.HasEntry(rx) && oe.HasEntry(dx):
-					continue
-				case oe.HasEntry(rx) && !oe.HasEntry(dx):
-					//
-				default:
-					rp += ".new"
-				}
-			}
-
-			err = file.CopyFile(dp, rp)
 		default:
 			continue
 		}
 
 		if err != nil {
+			return nil, err
+		}
+
+		if err := os.Chmod(rp, st.Mode()); err != nil {
 			return nil, err
 		}
 	}
@@ -242,7 +250,7 @@ func unmetDependencies(t *Tarball, d string) error {
 			continue
 		}
 
-		_, err := t.cfg.NewPackageByName(Sys, fi[0])
+		_, err := NewPackageByName(t.cfg, Sys, fi[0])
 
 		if err != nil {
 			pp = append(pp, fi[0])
@@ -257,5 +265,5 @@ func unmetDependencies(t *Tarball, d string) error {
 		return nil
 	}
 
-	return fmt.Errorf("install %s: depends on %s", t.Name, strings.Join(pp, ", "))
+	return fmt.Errorf("install %s: depends on %s", t.Name, pp)
 }

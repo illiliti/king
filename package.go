@@ -12,11 +12,17 @@ import (
 	"github.com/illiliti/king/internal/once"
 )
 
+// PackageType represepents package type
 type PackageType uint
 
 const (
+	// Any is the same as Sys + Usr
 	Any PackageType = iota
+
+	// Sys finds package in SysDB
 	Sys
+
+	// Usr finds package in UserDB
 	Usr
 )
 
@@ -25,7 +31,9 @@ var (
 	pathsOnce once.Once
 )
 
-// TODO String() ?
+// Package represents location to package.
+//
+// See https://kiss.armaanb.net/package-system#1.0
 type Package struct {
 	Name string
 	Path string
@@ -33,7 +41,8 @@ type Package struct {
 	cfg *Config
 }
 
-func (c *Config) NewPackageByName(t PackageType, n string) (*Package, error) {
+// NewPackageByName returns a pointer to Package with appropriate type.
+func NewPackageByName(c *Config, t PackageType, n string) (*Package, error) {
 	newPackage := func(n string, dd ...string) (*Package, error) {
 		for _, db := range dd {
 			p := filepath.Join(db, n)
@@ -73,10 +82,12 @@ func (c *Config) NewPackageByName(t PackageType, n string) (*Package, error) {
 	panic("unreachable")
 }
 
-func (c *Config) NewPackageByPath(p string) (*Package, error) {
+// NewPackageByPath finds a package that contains
+// given path and returns a pointer to Package.
+func NewPackageByPath(c *Config, p string) (*Package, error) {
 	err := pathsOnce.Do(func() error {
 		add := func(n string) error {
-			sp, err := c.NewPackageByName(Sys, n)
+			sp, err := NewPackageByName(c, Sys, n)
 
 			if err != nil {
 				return err
@@ -135,4 +146,8 @@ func (c *Config) NewPackageByPath(p string) (*Package, error) {
 	}
 
 	return nil, fmt.Errorf("package %s: not owned", p)
+}
+
+func (p *Package) String() string {
+	return p.Name
 }

@@ -1,8 +1,6 @@
 package main
 
 import (
-	"strings"
-
 	"github.com/illiliti/king"
 	"github.com/illiliti/king/internal/log"
 )
@@ -13,10 +11,10 @@ func install(c *king.Config, args []string) {
 	}
 
 	for _, n := range args {
-		t, err := c.NewTarball(n)
+		t, err := king.NewTarball(c, n)
 
 		if err != nil {
-			p, err := c.NewPackageByName(king.Any, n)
+			p, err := king.NewPackageByName(c, king.Any, n)
 
 			if err != nil {
 				log.Fatal(err)
@@ -36,5 +34,5 @@ func install(c *king.Config, args []string) {
 		}
 	}
 
-	log.Successf("installed %s", strings.Join(args, ", "))
+	log.Infof("installed %s", args)
 }

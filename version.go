@@ -7,12 +7,15 @@ import (
 	"strings"
 )
 
-// TODO String() ?
+// Version represents content of the version file.
+//
+// See https://kiss.armaanb.net/package-system#5.0
 type Version struct {
 	Version string
 	Release string
 }
 
+// Version returns a pointer to Version for a given package.
 func (p *Package) Version() (*Version, error) {
 	b, err := os.ReadFile(filepath.Join(p.Path, "version"))
 

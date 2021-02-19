@@ -15,7 +15,7 @@ func checksum(c *king.Config, args []string) {
 	}
 
 	for _, n := range args {
-		p, err := c.NewPackageByName(king.Any, n)
+		p, err := king.NewPackageByName(c, king.Any, n)
 
 		if err != nil {
 			log.Fatal(err)
@@ -29,18 +29,21 @@ func checksum(c *king.Config, args []string) {
 
 		hh := make([]king.Checksum, 0, len(ss))
 
+		log.Runningf("preparing %s", p.Name)
+
 		for _, s := range ss {
-			if h, ok := s.Protocol.(king.Checksum); ok {
+			h, ok := s.(king.Checksum)
+
+			if !ok {
+				log.Infof("skipping %s", s)
+			} else {
 				hh = append(hh, h)
 			}
 		}
 
 		if len(hh) == 0 {
-			// log.Infof("... %s", p.Name)
 			continue
 		}
-
-		// log.Runningf("generating checksums %s", p.Name)
 
 		c, err := chksum.Create(filepath.Join(p.Path, "checksums"))
 
@@ -49,6 +52,8 @@ func checksum(c *king.Config, args []string) {
 		}
 
 		for _, h := range hh {
+			log.Runningf("generating %s", h)
+
 			x, err := h.Sha256()
 
 			if err != nil {
@@ -71,5 +76,5 @@ func checksum(c *king.Config, args []string) {
 		}
 	}
 
-	// log.Successf("generated checksums %s", strings.Join(args, ", "))
+	log.Infof("processed %s", args)
 }

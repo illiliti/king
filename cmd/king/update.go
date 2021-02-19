@@ -11,7 +11,7 @@ import (
 func update(c *king.Config) {
 	log.Running("updating repositories")
 
-	upp, err := c.Update()
+	cc, err := king.Update(c)
 
 	if err != nil {
 		log.Fatal(err)
@@ -23,11 +23,17 @@ func update(c *king.Config) {
 	)
 
 	mpp := make(map[string]bool)
-	epp := make([]*king.Package, 0, len(upp))
+	epp := make([]*king.Package, 0, len(cc))
 
 	log.Running("resolving dependencies")
 
-	for _, p := range upp {
+	for _, m := range cc {
+		p, err := king.NewPackageByName(c, king.Usr, m.Name)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		dd, err := p.RecursiveDepends()
 
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -39,11 +45,11 @@ func update(c *king.Config) {
 				continue
 			}
 
-			if _, err := c.NewPackageByName(king.Sys, d.Name); err == nil {
+			if _, err := king.NewPackageByName(c, king.Sys, d.Name); err == nil {
 				continue
 			}
 
-			p, err := c.NewPackageByName(king.Usr, d.Name)
+			p, err := king.NewPackageByName(c, king.Usr, d.Name)
 
 			if err != nil {
 				log.Fatal(err)
@@ -66,40 +72,45 @@ func update(c *king.Config) {
 		}
 	}
 
-	// log.Infof("updating %s", strings.Join(ann, ", "))
-	// log.Ask("proceed to update?")
-	// log.Ask("proceed to update? [enter/ctrl+c]")
-	// log.Ask("ready to update %s, press enter to confirm or ctrl+c to abort", strings.Join(..., ", "))
+	app := append(dpp, epp...)
 
-	for _, p := range append(dpp, epp...) {
+	log.Askf("proceed to build? %s", app)
+
+	for _, p := range app {
 		ss, err := p.Sources()
 
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+
+		if err != nil {
 			log.Fatal(err)
 		}
 
-		log.Runningf("downloading %s", p.Name)
+		log.Runningf("preparing %s", p.Name)
 
 		for _, s := range ss {
-			d, ok := s.Protocol.(king.Downloader)
+			d, ok := s.(king.Downloader)
 
 			if !ok {
 				continue
 			}
+
+			log.Runningf("downloading %s", d)
 
 			if err := d.Download(false); err != nil {
 				log.Fatal(err)
 			}
 		}
 
-		log.Runningf("verifying %s", p.Name)
-
 		for _, s := range ss {
-			c, ok := s.Protocol.(king.Checksum)
+			c, ok := s.(king.Checksum)
 
 			if !ok {
 				continue
 			}
+
+			log.Runningf("verifying %s", c)
 
 			if err := c.Verify(); err != nil {
 				log.Fatal(err)
@@ -107,7 +118,13 @@ func update(c *king.Config) {
 		}
 	}
 
-	// log.Successf("downloaded %s", strings.Join(..., ", "))
+	for _, t := range tpp {
+		log.Runningf("installing pre-built dependency %s", t.Name)
+
+		if _, err := t.Install(c.HasForce); err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	for _, p := range dpp {
 		log.Runningf("building dependency %s", p.Name)
@@ -118,12 +135,6 @@ func update(c *king.Config) {
 			log.Fatal(err)
 		}
 
-		tpp = append(tpp, t)
-	}
-
-	// log.Successf("built %s", strings.Join(..., ", "))
-
-	for _, t := range tpp {
 		log.Runningf("installing dependency %s", t.Name)
 
 		if _, err := t.Install(c.HasForce); err != nil {
@@ -131,25 +142,21 @@ func update(c *king.Config) {
 		}
 	}
 
-	// log.Successf("installed %s", strings.Join(..., ", "))
-
 	for _, p := range epp {
 		log.Runningf("building %s", p.Name)
 
-		if _, err := p.Build(); err != nil {
+		t, err := p.Build()
+
+		if err != nil {
 			log.Fatal(err)
 		}
-	}
 
-	// log.Successf("built %s", strings.Join(..., ", "))
-
-	for _, p := range epp {
 		log.Runningf("installing %s", p.Name)
 
-		if _, err := p.Build(); err != nil {
+		if _, err := t.Install(c.HasForce); err != nil {
 			log.Fatal(err)
 		}
 	}
 
-	// log.Successf("installed %s", strings.Join(..., ", "))
+	log.Infof("processed %s", cc)
 }

@@ -13,9 +13,9 @@ require (
 	github.com/pierrec/lz4/v4 v4.1.3 // indirect
 	github.com/ulikunitz/xz v0.5.10 // indirect
 	github.com/xanzy/ssh-agent v0.3.0 // indirect
-	golang.org/x/crypto v0.0.0-20201221181555-eec23a3978ad // indirect
+	golang.org/x/crypto v0.0.0-20210218145215-b8e89b74b9df // indirect
 	golang.org/x/net v0.0.0-20210119194325-5f4716e94777 // indirect
-	golang.org/x/sys v0.0.0-20210216224549-f992740a1bac // indirect
+	golang.org/x/sys v0.0.0-20210218155724-8ebf48af031b // indirect
 )
 
 // see https://github.com/mholt/archiver/pull/265

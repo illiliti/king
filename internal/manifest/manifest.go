@@ -109,6 +109,22 @@ func (m *Manifest) Delete(p string) {
 	}
 }
 
+func (m *Manifest) Rehash() error {
+	if _, err := m.f.Seek(0, 0); err != nil {
+		return err
+	}
+
+	m.pp = make([]string, 0, len(m.pp))
+
+	sc := bufio.NewScanner(m.f)
+
+	for sc.Scan() {
+		m.pp = append(m.pp, sc.Text())
+	}
+
+	return sc.Err()
+}
+
 func (m *Manifest) Flush() error {
 	if err := m.f.Truncate(0); err != nil {
 		return err

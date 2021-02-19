@@ -34,7 +34,7 @@ func list(c *king.Config, args []string) {
 
 		return dd
 	}() {
-		p, err := c.NewPackageByName(king.Sys, n)
+		p, err := king.NewPackageByName(c, king.Sys, n)
 
 		if err != nil {
 			log.Fatal(err)

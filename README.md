@@ -1,14 +1,14 @@
 # king
 Next generation of the KISS package manager
 
-**Unstable, not intended for daily usage**
+**Highly experimental, not intended for daily usage. DO NOT RUN ON REAL SYSTEM!**
 
 ## Dependencies
 * Go >= 1.16 (build time)
 
 ## Installation
 ```sh
-# change directory
+# change directory to cli sources
 cd cmd/king
 
 # build dynamic binary
@@ -27,64 +27,63 @@ go build -tags 'osusergo netgo' -ldflags '-s -w'
     * [ ] document usage (with examples!!!)
     * [ ] document supported archive formats
     * [ ] document differences between kiss and king
-    * [ ] document the whole codebase (with examples!!!)
+    * [ ] document the whole codebase
+        * [x] function/struct description
+        * [x] general package documentation
+        * [ ] examples
+        * [ ] ...
 * common
     * [ ] Makefile
     * [ ] unit tests (CI)
     * [ ] improve logging
     * [ ] improve error messages
+    * [ ] rework debugging stuff
 * future
     * [ ] hooks?
     * [ ] binary packages?
     * [ ] root-less chroot builds?
-    * [ ] switch actions to getopt-like flags
+    * [ ] /var/db/kiss/installed as a git repository?
+    * [ ] switch actions to getopt-like flags with subcommands
+    * [ ] checksums, sources, version file shouldn't be mandatory
     * [ ] implement privilege elevation mess? is it really needed?
     * [ ] replace list and search actions with query action like in xbps
     * [ ] detach from original KISS but preserve repository layout compatibility?
 * action
     * [x] alternative
-    * [ ] build
-        * [ ] rewrite logging messages
-        * [ ] ask confirmation about building
+    * [x] build && update
         * [ ] add a way to skip checksum verification
-    * [ ] checksum
-        * [x] fix empty checksums file if sources file only contains git source
-        * [ ] rewrite logging messages
+        * [ ] optionally remove make dependencies after a build
+    * [x] checksum
     * [x] download
     * [x] install
     * [x] list
     * [x] remove
     * [x] search
-    * [x] update
 * library
     * [x] alternative
-    * [ ] build
+    * [x] build
         * [x] dynamic dependencies based on ldd-like output
-        * [ ] strip binaries using pure go (will be implemented as separate project)
+        * [ ] strip binaries using pure go (will be implemented as a standalone project)
         * [x] remove .la and charset.alias
         * [ ] logging to file and stdout
         * [ ] add a way to resume build
         * [ ] handle ctrl+c
     * [x] checksum
     * [ ] config
+        * [ ] clean up code
         * [ ] file-based config?
         * [ ] rename essential directories
         * [ ] use system directory for sources/binaries?
-    * [ ] dependency
+    * [x] dependency
         * [ ] guard against circular dependencies
-    * [ ] download
+    * [x] download
         * [ ] progress bar
-        * [x] drop ctxsignal
-    * [ ] install
-        * [ ] guard against incomplete installation
-        * [ ] ensure that /etc/ handling is working correctly
+    * [x] install
     * [x] package
-    * [ ] prepare
+    * [ ] extract
         * [ ] git clone commit/branch
         * [ ] progress bar for git cloning
     * [ ] remove
-        * [ ] guard against incomplete removal
-        * [x] automagically swap dangling alternatives
         * [ ] add a way to forcefully remove files in /etc/
     * [ ] source
         * [x] handle https
@@ -94,6 +93,8 @@ go build -tags 'osusergo netgo' -ldflags '-s -w'
         * [x] handle absolute/relative files
     * [x] tarball
     * [ ] update
-        * [ ] builtin "kiss-outdated"
-        * [ ] speed up via concurrency
+        * [ ] parallelism
     * [x] version
+* completion
+    * [ ] zsh
+    * [ ] ...

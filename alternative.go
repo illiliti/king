@@ -9,7 +9,9 @@ import (
 	"github.com/illiliti/king/internal/manifest"
 )
 
-// TODO String() ?
+// Alternative represents location to swapable alternative.
+//
+// See https://kiss.armaanb.net/package-manager#3.2
 type Alternative struct {
 	Name string
 	Path string
@@ -17,7 +19,10 @@ type Alternative struct {
 	cfg *Config
 }
 
-func (c *Config) NewAlternativeByPath(p string) (*Alternative, error) {
+// NewAlternativeByPath returns a pointer to Alternative for a given path.
+//
+// If ChoicesDir contains directories, error will be returned.
+func NewAlternativeByPath(c *Config, p string) (*Alternative, error) {
 	dd, err := os.ReadDir(filepath.Join(c.RootDir, ChoicesDir))
 
 	if err != nil {
@@ -27,6 +32,10 @@ func (c *Config) NewAlternativeByPath(p string) (*Alternative, error) {
 	s := strings.ReplaceAll(p, "/", ">")
 
 	for _, de := range dd {
+		if de.IsDir() {
+			return nil, fmt.Errorf("alternative %s: is a directory", de.Name())
+		}
+
 		if !strings.HasSuffix(de.Name(), s) {
 			continue
 		}
@@ -41,7 +50,10 @@ func (c *Config) NewAlternativeByPath(p string) (*Alternative, error) {
 	return nil, fmt.Errorf("alternative %s: not found", p)
 }
 
-func (c *Config) NewAlternativeByNamePath(n, p string) (*Alternative, error) {
+// NewAlternativeByNamePath returns a pointer to Alternative for a given name and path.
+//
+// If given path is a directory, error will be returned.
+func NewAlternativeByNamePath(c *Config, n, p string) (*Alternative, error) {
 	a := filepath.Join(c.RootDir, ChoicesDir, n+strings.ReplaceAll(p, "/", ">"))
 	st, err := os.Lstat(a)
 
@@ -60,14 +72,17 @@ func (c *Config) NewAlternativeByNamePath(n, p string) (*Alternative, error) {
 	}, nil
 }
 
+// Swap swaps current alternative and returns a pointer to new Alternative.
+//
+// Current alternative must exist, otherwise error will be returned.
 func (a *Alternative) Swap() (*Alternative, error) {
-	sp, err := a.cfg.NewPackageByName(Sys, a.Name)
+	sp, err := NewPackageByName(a.cfg, Sys, a.Name)
 
 	if err != nil {
 		return nil, err
 	}
 
-	cp, err := a.cfg.NewPackageByPath(a.Path)
+	cp, err := NewPackageByPath(a.cfg, a.Path)
 
 	if err != nil {
 		return nil, err

@@ -10,8 +10,6 @@ import (
 	"github.com/illiliti/king/internal/file"
 )
 
-// TODO rename Etcsum to ... ?
-
 type Etcsum struct {
 	f  *os.File
 	ee map[string]bool

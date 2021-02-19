@@ -44,7 +44,7 @@ func alternative(c *king.Config, args []string) {
 
 	for _, a := range func() []*king.Alternative {
 		if len(args) == 2 {
-			a, err := c.NewAlternativeByNamePath(args[0], args[1])
+			a, err := king.NewAlternativeByNamePath(c, args[0], args[1])
 
 			if err != nil {
 				log.Fatal(err)
@@ -64,7 +64,7 @@ func alternative(c *king.Config, args []string) {
 				continue
 			}
 
-			a, err := c.NewAlternativeByNamePath(fi[0], fi[1])
+			a, err := king.NewAlternativeByNamePath(c, fi[0], fi[1])
 
 			if err != nil {
 				log.Fatal(err)
@@ -79,7 +79,7 @@ func alternative(c *king.Config, args []string) {
 
 		return aa
 	}() {
-		p, err := c.NewPackageByPath(a.Path)
+		p, err := king.NewPackageByPath(c, a.Path)
 
 		if err != nil {
 			log.Fatal(err)
@@ -90,9 +90,5 @@ func alternative(c *king.Config, args []string) {
 		if _, err := a.Swap(); err != nil {
 			log.Fatal(err)
 		}
-
-		// log.Successf("swapped %s", a.Path)
 	}
-
-	// log.Successf("swapped %s", strings.Join(..., ", "))
 }

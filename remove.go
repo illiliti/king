@@ -15,11 +15,22 @@ import (
 	"github.com/illiliti/king/internal/manifest"
 )
 
+// Remove removes given package from the system.
+//
+// If force equal false, Remove checks if other packages depends
+// on given package and returns error if so. Otherwise, this check is
+// entirely skipped.
 func (p *Package) Remove(force bool) error {
-	dd, err := p.ReverseDepends()
+	if !force {
+		dd, err := p.ReverseDepends()
 
-	if !force && err == nil && len(dd) > 0 {
-		return fmt.Errorf("remove %s: required by %s", p.Name, strings.Join(dd, ", "))
+		if err != nil {
+			return err
+		}
+
+		if len(dd) > 0 {
+			return fmt.Errorf("remove %s: required by %s", p.Name, dd)
+		}
 	}
 
 	om, err := manifest.Open(filepath.Join(p.Path, "manifest"))
@@ -37,14 +48,9 @@ func (p *Package) Remove(force bool) error {
 	}
 
 	defer oe.Close()
-	defer pathsOnce.Reset()
-	defer dependenciesOnce.Reset()
-
-	signal.Ignore(os.Interrupt)
-	defer signal.Reset(os.Interrupt)
 
 	for _, r := range om.Remove() {
-		oa, err := p.cfg.NewAlternativeByPath(r)
+		oa, err := NewAlternativeByPath(p.cfg, r)
 
 		if err != nil {
 			continue
@@ -54,15 +60,20 @@ func (p *Package) Remove(force bool) error {
 			continue
 		}
 
-		na, err := oa.Swap()
-
-		if err != nil {
+		if _, err := oa.Swap(); err != nil {
 			return err
 		}
-
-		om.Insert(ChoicesDir)
-		om.Replace(na.Path, filepath.Join(ChoicesDir, na.Name+strings.ReplaceAll(na.Path, "/", ">")))
 	}
+
+	if err := om.Rehash(); err != nil {
+		return err
+	}
+
+	defer pathsOnce.Reset()
+	defer dependenciesOnce.Reset()
+
+	signal.Ignore(os.Interrupt)
+	defer signal.Reset(os.Interrupt)
 
 	for _, r := range om.Remove() {
 		rp := filepath.Join(p.cfg.RootDir, r)

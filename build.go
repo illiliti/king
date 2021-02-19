@@ -16,6 +16,8 @@ import (
 	"github.com/illiliti/king/internal/manifest"
 )
 
+// Build unpacks sources, runs build script, assembles output into
+// installable tarball and returns a pointer to Tarball for a given package.
 func (p *Package) Build() (*Tarball, error) {
 	pd := filepath.Join(p.cfg.PkgDir, p.Name)
 	bd := filepath.Join(p.cfg.BuildDir, p.Name)
@@ -50,13 +52,13 @@ func (p *Package) Build() (*Tarball, error) {
 	}
 
 	for _, s := range ss {
-		d := filepath.Join(bd, s.DestinationDir)
+		d := filepath.Join(bd, s.ExtractDir())
 
 		if err := os.MkdirAll(d, 0777); err != nil {
 			return nil, err
 		}
 
-		if err := s.Prepare(d); err != nil {
+		if err := s.Extract(d); err != nil {
 			return nil, err
 		}
 	}
@@ -186,7 +188,7 @@ func updateDepends(bp *Package, pd, pdp string) error {
 				continue
 			}
 
-			p, err := bp.cfg.NewPackageByPath(filepath.Join("/usr/lib", l))
+			p, err := NewPackageByPath(bp.cfg, filepath.Join("/usr/lib", l))
 
 			if err != nil {
 				continue
