@@ -53,6 +53,7 @@ go build -tags 'osusergo netgo' -ldflags '-s -w'
     * [x] build && update
         * [ ] add a way to skip checksum verification
         * [ ] optionally remove make dependencies after a build
+        * [ ] add a way to ignore update for specified package[s]
     * [x] checksum
     * [x] download
     * [x] install
@@ -80,10 +81,10 @@ go build -tags 'osusergo netgo' -ldflags '-s -w'
         * [ ] progress bar
     * [x] install
     * [x] package
-    * [ ] extract
+    * [x] extract
         * [ ] git clone commit/branch
         * [ ] progress bar for git cloning
-    * [ ] remove
+    * [x] remove
         * [ ] add a way to forcefully remove files in /etc/
     * [ ] source
         * [x] handle https
@@ -92,8 +93,8 @@ go build -tags 'osusergo netgo' -ldflags '-s -w'
             * [ ] branch
         * [x] handle absolute/relative files
     * [x] tarball
-    * [ ] update
-        * [ ] parallelism
+    * [x] update
+        * [ ] fix https://github.com/go-git/go-git/issues/37
     * [x] version
 * completion
     * [ ] zsh

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 
 	"github.com/illiliti/king/internal/manifest"
 )
@@ -88,7 +89,7 @@ func (a *Alternative) Swap() (*Alternative, error) {
 		return nil, err
 	}
 
-	defer pathsOnce.Reset()
+	defer atomic.StoreUint32(&pathsCount, 0)
 
 	ap := strings.ReplaceAll(a.Path, "/", ">")
 

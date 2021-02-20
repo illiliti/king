@@ -3,17 +3,19 @@ package king
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/illiliti/king/internal/once"
+	"sync"
+	"sync/atomic"
 )
 
 var (
-	dependenciesOnce once.Once
-	dependencies     map[string][]string
+	dependenciesCount uint32
+	dependenciesMutex sync.Mutex
+	dependencies      map[string][]string
 )
 
 // Dependency represents a line of the depends file.
@@ -90,49 +92,64 @@ func (p *Package) RecursiveDepends() ([]*Dependency, error) {
 // over SysDB and returns slice of strings with no make dependencies.
 //
 // TODO allow UserDB?
-// TODO early return causes nil deference on uninitialized map
 func (p *Package) ReverseDepends() ([]string, error) {
-	err := dependenciesOnce.Do(func() error {
-		dd, err := os.ReadDir(p.cfg.SysDB)
+	if err := initDependencies(p); err != nil {
+		return nil, err
+	}
+
+	if dd, ok := dependencies[p.Name]; ok {
+		return dd, nil
+	}
+
+	return nil, fmt.Errorf("depends %s: no reverse dependencies", p.Name)
+}
+
+func initDependencies(p *Package) error {
+	if atomic.LoadUint32(&dependenciesCount) == 1 {
+		return nil
+	}
+
+	dependenciesMutex.Lock()
+	defer dependenciesMutex.Unlock()
+
+	if atomic.LoadUint32(&dependenciesCount) == 1 {
+		return nil
+	}
+
+	dd, err := os.ReadDir(p.cfg.SysDB)
+
+	if err != nil {
+		return err
+	}
+
+	dependencies = make(map[string][]string, len(dd))
+
+	for _, de := range dd {
+		sp, err := NewPackageByName(p.cfg, Sys, de.Name())
+
+		if err != nil {
+			return err
+		}
+
+		dd, err := sp.Depends()
 
 		if errors.Is(err, fs.ErrNotExist) {
-			return nil
+			continue
 		}
 
 		if err != nil {
 			return err
 		}
 
-		dependencies = make(map[string][]string, len(dd))
-
-		for _, de := range dd {
-			sp, err := NewPackageByName(p.cfg, Sys, de.Name())
-
-			if err != nil {
-				return err
-			}
-
-			dd, err := sp.Depends()
-
-			if errors.Is(err, fs.ErrNotExist) {
+		for _, d := range dd {
+			if d.IsMake {
 				continue
 			}
 
-			if err != nil {
-				return err
-			}
-
-			for _, d := range dd {
-				if d.IsMake {
-					continue
-				}
-
-				dependencies[d.Name] = append(dependencies[d.Name], sp.Name)
-			}
+			dependencies[d.Name] = append(dependencies[d.Name], sp.Name)
 		}
+	}
 
-		return nil
-	})
-
-	return dependencies[p.Name], err
+	atomic.StoreUint32(&dependenciesCount, 1)
+	return nil
 }

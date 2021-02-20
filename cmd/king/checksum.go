@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"path/filepath"
 
 	"github.com/illiliti/king"
@@ -57,10 +56,6 @@ func checksum(c *king.Config, args []string) {
 			x, err := h.Sha256()
 
 			if err != nil {
-				if errors.Is(err, king.ErrIsDir) {
-					continue
-				}
-
 				log.Fatal(err)
 			}
 

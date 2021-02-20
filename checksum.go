@@ -1,18 +1,12 @@
 package king
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/illiliti/king/internal/chksum"
 	"github.com/illiliti/king/internal/file"
-)
-
-var (
-	// ErrIsDir indicates that file is a directory.
-	ErrIsDir = errors.New("is a directory")
 )
 
 // Checksum abstracts checksum-related functions for the source.
@@ -27,6 +21,8 @@ func (h *HTTP) Sha256() (string, error) {
 }
 
 // Sha256 returns sha256 sum of file source
+//
+// Return value for directories is "", nil
 func (f *File) Sha256() (string, error) {
 	st, err := os.Stat(f.p)
 
@@ -35,7 +31,7 @@ func (f *File) Sha256() (string, error) {
 	}
 
 	if st.IsDir() {
-		return "", fmt.Errorf("checksum %s: %w", f.p, ErrIsDir)
+		return "", nil
 	}
 
 	return file.Sha256(f.p)
@@ -56,12 +52,12 @@ func (h *HTTP) Verify() error {
 func (f *File) Verify() error {
 	x, err := f.Sha256()
 
-	if errors.Is(err, ErrIsDir) {
-		return nil
-	}
-
 	if err != nil {
 		return err
+	}
+
+	if x == "" {
+		return nil
 	}
 
 	return verify(f.pkg, f.p, x)

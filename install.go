@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 
 	"github.com/illiliti/king/internal/etcsum"
 	"github.com/illiliti/king/internal/file"
@@ -104,8 +105,8 @@ func (t *Tarball) Install(force bool) (*Package, error) {
 		return nil, err
 	}
 
-	defer pathsOnce.Reset()
-	defer dependenciesOnce.Reset()
+	defer atomic.StoreUint32(&pathsCount, 0)
+	defer atomic.StoreUint32(&dependenciesCount, 0)
 
 	signal.Ignore(os.Interrupt)
 	defer signal.Reset(os.Interrupt)
@@ -121,7 +122,7 @@ func (t *Tarball) Install(force bool) (*Package, error) {
 			return nil, err
 		}
 
-		if strings.HasPrefix(i, "/etc/") && !strings.HasSuffix(i, "/") {
+		if st.Mode().IsRegular() && strings.HasPrefix(i, "/etc/") {
 			dx, err := file.Sha256(dp)
 
 			if err != nil {
@@ -149,7 +150,11 @@ func (t *Tarball) Install(force bool) (*Package, error) {
 
 		switch {
 		case st.IsDir():
-			err = os.MkdirAll(rp, 0)
+			if err := os.MkdirAll(rp, 0); err != nil {
+				return nil, err
+			}
+
+			err = os.Chmod(rp, st.Mode())
 		case st.Mode().IsRegular():
 			err = file.CopyFile(dp, rp)
 		case st.Mode()&fs.ModeSymlink != 0:
@@ -161,13 +166,10 @@ func (t *Tarball) Install(force bool) (*Package, error) {
 		if err != nil {
 			return nil, err
 		}
-
-		if err := os.Chmod(rp, st.Mode()); err != nil {
-			return nil, err
-		}
 	}
 
 	for _, r := range om.Remove() {
+		// TODO slow
 		if nm.HasEntry(r) {
 			continue
 		}
@@ -195,20 +197,25 @@ func (t *Tarball) Install(force bool) (*Package, error) {
 				continue
 			}
 		case st.IsDir():
-			f, err := os.Open(rp)
+			err := func() error {
+				f, err := os.Open(rp)
 
-			if err != nil {
-				return nil, err
-			}
+				if err != nil {
+					return err
+				}
 
-			_, err = f.ReadDir(1)
+				defer f.Close()
 
-			if err := f.Close(); err != nil {
-				return nil, err
-			}
+				_, err = f.ReadDir(1)
+				return err
+			}()
 
 			if !errors.Is(err, io.EOF) {
-				continue
+				if err == nil {
+					continue
+				}
+
+				return nil, err
 			}
 		}
 

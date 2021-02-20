@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 
 	"github.com/illiliti/king/internal/etcsum"
 	"github.com/illiliti/king/internal/file"
@@ -24,11 +25,7 @@ func (p *Package) Remove(force bool) error {
 	if !force {
 		dd, err := p.ReverseDepends()
 
-		if err != nil {
-			return err
-		}
-
-		if len(dd) > 0 {
+		if err == nil {
 			return fmt.Errorf("remove %s: required by %s", p.Name, dd)
 		}
 	}
@@ -69,8 +66,8 @@ func (p *Package) Remove(force bool) error {
 		return err
 	}
 
-	defer pathsOnce.Reset()
-	defer dependenciesOnce.Reset()
+	defer atomic.StoreUint32(&pathsCount, 0)
+	defer atomic.StoreUint32(&dependenciesCount, 0)
 
 	signal.Ignore(os.Interrupt)
 	defer signal.Reset(os.Interrupt)
@@ -99,20 +96,25 @@ func (p *Package) Remove(force bool) error {
 				continue
 			}
 		case st.IsDir():
-			f, err := os.Open(rp)
+			err := func() error {
+				f, err := os.Open(rp)
 
-			if err != nil {
+				if err != nil {
+					return err
+				}
+
+				defer f.Close()
+
+				_, err = f.ReadDir(1)
 				return err
-			}
-
-			_, err = f.ReadDir(1)
-
-			if err := f.Close(); err != nil {
-				return err
-			}
+			}()
 
 			if !errors.Is(err, io.EOF) {
-				continue
+				if err == nil {
+					continue
+				}
+
+				return err
 			}
 		}
 

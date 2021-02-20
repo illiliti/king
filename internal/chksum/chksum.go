@@ -48,7 +48,9 @@ func (c *Chksum) HasEntry(x string) bool {
 }
 
 func (c *Chksum) Insert(x string) {
-	c.cc[x] = true
+	if x != "" {
+		c.cc[x] = true
+	}
 }
 
 func (c *Chksum) Flush() error {

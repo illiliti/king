@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"sync"
 
 	"github.com/go-git/go-git/v5"
 )
@@ -51,43 +52,54 @@ func Update(c *Config) ([]*Candidate, error) {
 		return nil, err
 	}
 
+	var mx sync.Mutex
+	var wg sync.WaitGroup
+
+	wg.Add(len(dd))
 	cc := make([]*Candidate, 0, len(dd))
 
-	// TODO parallelism
 	for _, de := range dd {
-		sp, err := NewPackageByName(c, Sys, de.Name())
+		go func(n string) {
+			defer wg.Done()
 
-		if err != nil {
-			return nil, err
-		}
+			up, err := NewPackageByName(c, Usr, n)
 
-		sv, err := sp.Version()
+			if err != nil {
+				return
+			}
 
-		if err != nil {
-			return nil, err
-		}
+			uv, err := up.Version()
 
-		up, err := NewPackageByName(c, Usr, de.Name())
+			if err != nil {
+				return
+			}
 
-		if err != nil {
-			continue
-		}
+			sp, err := NewPackageByName(c, Sys, n)
 
-		uv, err := up.Version()
+			if err != nil {
+				return
+			}
 
-		if err != nil {
-			return nil, err
-		}
+			sv, err := sp.Version()
 
-		if *sv == *uv {
-			continue
-		}
+			if err != nil {
+				return
+			}
 
-		cc = append(cc, &Candidate{
-			Name: up.Name,
-		})
+			if *sv == *uv {
+				return
+			}
+
+			mx.Lock()
+			defer mx.Unlock()
+
+			cc = append(cc, &Candidate{
+				Name: up.Name,
+			})
+		}(de.Name())
 	}
 
+	wg.Wait()
 	return cc, nil
 }
 

@@ -95,7 +95,7 @@ func (m *Manifest) Replace(o, n string) {
 }
 
 func (m *Manifest) Insert(p string) {
-	if !m.HasEntry(p) {
+	if p != "" && !m.HasEntry(p) {
 		m.pp = append(m.pp, p)
 	}
 }
