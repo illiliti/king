@@ -1,18 +1,25 @@
 package king
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 
-	"github.com/illiliti/king/internal/manifest"
+	"github.com/illiliti/king/manifest"
 )
 
-// Alternative represents location to swapable alternative.
+// TODO unit tests
+// TODO better docs
+
+var (
+	ErrAlternativeNotFound = errors.New("conflict has not been occured yet")
+)
+
+// Alternative represents conflict within multiple packages.
 //
-// See https://kiss.armaanb.net/package-manager#3.2
+// See https://k1sslinux.org/package-manager#3.2
 type Alternative struct {
 	Name string
 	Path string
@@ -20,85 +27,94 @@ type Alternative struct {
 	cfg *Config
 }
 
-// NewAlternativeByPath returns a pointer to Alternative for a given path.
-//
-// If ChoicesDir contains directories, error will be returned.
-func NewAlternativeByPath(c *Config, p string) (*Alternative, error) {
-	dd, err := os.ReadDir(filepath.Join(c.RootDir, ChoicesDir))
+type AlternativeOptions struct {
+	Name string
+	Path string
+}
+
+func NewAlternative(c *Config, ao *AlternativeOptions) (*Alternative, error) {
+	if err := ao.Validate(); err != nil {
+		return nil, fmt.Errorf("validate AlternativeOptions: %w", err)
+	}
+
+	aa, err := Alternatives(c)
 
 	if err != nil {
 		return nil, err
 	}
 
-	s := strings.ReplaceAll(p, "/", ">")
+	for _, a := range aa {
+		if a.Path == ao.Path {
+			return a, nil
+		}
+	}
+
+	return nil, fmt.Errorf("find alternative %s: %w", ao.Path, ErrAlternativeNotFound)
+}
+
+func Alternatives(c *Config) ([]*Alternative, error) {
+	// TODO cache results
+	// TODO return map
+
+	dd, err := os.ReadDir(c.AlternativeDir)
+
+	if err != nil {
+		return nil, err
+	}
+
+	aa := make([]*Alternative, 0, len(dd))
 
 	for _, de := range dd {
+		// TODO panic()
 		if de.IsDir() {
-			return nil, fmt.Errorf("alternative %s: is a directory", de.Name())
-		}
-
-		if !strings.HasSuffix(de.Name(), s) {
 			continue
 		}
 
-		return &Alternative{
-			Name: strings.TrimSuffix(de.Name(), s),
-			Path: p,
+		i := strings.Index(de.Name(), ">")
+
+		// TODO panic()
+		if i < 1 {
+			continue
+		}
+
+		aa = append(aa, &Alternative{
+			Name: de.Name()[:i],
+			Path: strings.ReplaceAll(de.Name()[i:], ">", "/"),
 			cfg:  c,
-		}, nil
+		})
 	}
 
-	return nil, fmt.Errorf("alternative %s: not found", p)
+	return aa, nil
 }
 
-// NewAlternativeByNamePath returns a pointer to Alternative for a given name and path.
-//
-// If given path is a directory, error will be returned.
-func NewAlternativeByNamePath(c *Config, n, p string) (*Alternative, error) {
-	a := filepath.Join(c.RootDir, ChoicesDir, n+strings.ReplaceAll(p, "/", ">"))
-	st, err := os.Lstat(a)
-
-	if err != nil {
-		return nil, err
-	}
-
-	if st.IsDir() {
-		return nil, fmt.Errorf("alternative %s: is a directory", a)
-	}
-
-	return &Alternative{
-		Name: n,
-		Path: p,
-		cfg:  c,
-	}, nil
-}
-
-// Swap swaps current alternative and returns a pointer to new Alternative.
-//
-// Current alternative must exist, otherwise error will be returned.
 func (a *Alternative) Swap() (*Alternative, error) {
-	sp, err := NewPackageByName(a.cfg, Sys, a.Name)
+	sp, err := NewPackage(a.cfg, &PackageOptions{
+		Name: a.Name,
+		From: Database,
+	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	cp, err := NewPackageByPath(a.cfg, a.Path)
+	cp, err := NewPackage(a.cfg, &PackageOptions{
+		Path: a.Path,
+	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	defer atomic.StoreUint32(&pathsCount, 0)
+	defer a.cfg.ResetOwnedPaths()
 
 	ap := strings.ReplaceAll(a.Path, "/", ">")
 
-	if err := replace(cp, true, a.Path, filepath.Join(ChoicesDir, cp.Name+ap)); err != nil {
-		return nil, err
+	if err := swap(cp, a.Path, filepath.Join(a.cfg.AlternativeDir, cp.Name+ap), true); err != nil {
+		return nil, fmt.Errorf("swap path %s: %w", a.Path, err)
 	}
 
-	if err := replace(sp, false, filepath.Join(ChoicesDir, sp.Name+ap), a.Path); err != nil {
-		return nil, err
+	if err := swap(sp, filepath.Join(a.cfg.AlternativeDir, sp.Name+ap), a.Path, false); err != nil {
+		return nil, fmt.Errorf("swap path %s: %w", a.Path, err)
 	}
 
 	return &Alternative{
@@ -108,28 +124,32 @@ func (a *Alternative) Swap() (*Alternative, error) {
 	}, nil
 }
 
-func replace(p *Package, c bool, f, t string) error {
-	if err := os.Rename(filepath.Join(p.cfg.RootDir, f), filepath.Join(p.cfg.RootDir, t)); err != nil {
+func swap(p *Package, s, d string, ad bool) error {
+	if err := os.Rename(filepath.Join(p.cfg.RootDir, s), filepath.Join(p.cfg.RootDir, d)); err != nil {
 		return err
 	}
 
-	m, err := manifest.Open(filepath.Join(p.Path, "manifest"))
+	mf, err := manifest.Open(filepath.Join(p.Path, "manifest"), os.O_RDWR)
 
 	if err != nil {
 		return err
 	}
 
-	m.Replace(f, t)
+	mf.Replace(s, d)
 
-	if c {
-		m.Insert(ChoicesDir + "/")
+	if ad {
+		mf.Insert(p.cfg.AlternativeDir + "/")
 	} else {
-		m.Delete(ChoicesDir + "/")
+		mf.Delete(p.cfg.AlternativeDir + "/")
 	}
 
-	if err := m.Flush(); err != nil {
+	if err := mf.Flush(); err != nil {
 		return err
 	}
 
-	return m.Close()
+	return mf.Close()
+}
+
+func (a *Alternative) String() string {
+	return a.Name + " " + a.Path
 }

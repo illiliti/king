@@ -1,3 +1,3 @@
 // Package king provides high-level interfaces
-// for interacting with the king package system.
+// to interact with kiss-compatible package system
 package king

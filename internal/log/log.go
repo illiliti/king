@@ -5,50 +5,56 @@ import (
 	"os"
 )
 
+// TODO colors ?
 const (
-	ask     = "?>"
 	info    = "->"
 	fatal   = "!!"
+	prompt  = "?>"
 	running = ">>"
 )
 
-func Ask(v ...interface{}) {
-	Log(ask, v...)
-	fmt.Scanln()
+var NoPrompt bool
+
+func Info(v interface{}) {
+	log(info, v)
 }
 
-func Info(v ...interface{}) {
-	Log(info, v...)
-}
-
-func Fatal(v ...interface{}) {
-	Log(fatal, v...)
+func Fatal(v interface{}) {
+	log(fatal, v)
 	os.Exit(1)
 }
 
-func Running(v ...interface{}) {
-	Log(running, v...)
+func Prompt(v interface{}) {
+	if !NoPrompt {
+		log(prompt, v)
+		fmt.Scanln()
+	}
 }
 
-func Askf(f string, v ...interface{}) {
-	Log(ask, fmt.Sprintf(f, v...))
-	fmt.Scanln()
+func Running(v interface{}) {
+	log(running, v)
 }
 
 func Infof(f string, v ...interface{}) {
-	Log(info, fmt.Sprintf(f, v...))
+	log(info, fmt.Sprintf(f, v...))
 }
 
 func Fatalf(f string, v ...interface{}) {
-	Log(fatal, fmt.Sprintf(f, v...))
+	log(fatal, fmt.Sprintf(f, v...))
 	os.Exit(1)
 }
 
-func Runningf(f string, v ...interface{}) {
-	Log(running, fmt.Sprintf(f, v...))
+func Promptf(f string, v ...interface{}) {
+	if !NoPrompt {
+		log(prompt, fmt.Sprintf(f, v...))
+		fmt.Scanln()
+	}
 }
 
-func Log(p string, v ...interface{}) {
-	s := fmt.Sprintln(v...)
-	fmt.Fprintln(os.Stderr, p, s[:len(s)-1])
+func Runningf(f string, v ...interface{}) {
+	log(running, fmt.Sprintf(f, v...))
+}
+
+func log(p string, v interface{}) {
+	fmt.Fprintln(os.Stderr, p, v)
 }

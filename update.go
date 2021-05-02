@@ -2,107 +2,157 @@ package king
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"sync"
 
 	"github.com/go-git/go-git/v5"
+	"golang.org/x/sync/errgroup"
 )
 
-// Candidate represents candidate for upgrading.
-type Candidate struct {
-	Name string
+// TODO unit tests
+// TODO better docs
+
+// UpdateOptions provides facilities for updating repositories.
+type UpdateOptions struct {
+	// NoUpdateRepositories disables updating repositories.
+	NoUpdateRepositories bool
+
+	// ContinueOnError ignores possible errors during updating repositories.
+	ContinueOnError bool
+
+	// ExcludePackages ignores update for speficifed packages.
+	ExcludePackages []string
 }
 
-// Update updates repositories, interates over SysDB and returns non-empty
-// slice of Candidate pointers if at least one installed package version differs
-// to version available in repositories.
-//
-// TODO intergrate "kiss-outdated" functionality
-func Update(c *Config) ([]*Candidate, error) {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-	defer stop()
+// Update optionally pulls repositories and parses candidates for upgrade.
+func Update(c *Config, uo *UpdateOptions) ([]*Package, error) {
+	if !uo.NoUpdateRepositories {
+		err := updateRepositories(c.Repositories)
 
-	for _, db := range c.UserDB {
-		r, err := git.PlainOpenWithOptions(db, &git.PlainOpenOptions{
-			DetectDotGit: true,
-		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		w, err := r.Worktree()
-
-		if err != nil {
-			return nil, err
-		}
-
-		if err := w.PullContext(ctx, &git.PullOptions{
-			Progress:          os.Stderr,
-			RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
-		}); err != nil && err != git.NoErrAlreadyUpToDate && err != git.ErrRemoteNotFound {
-			return nil, err
+		if !uo.ContinueOnError && err != nil {
+			return nil, fmt.Errorf("update repositories: %w", err)
 		}
 	}
 
-	dd, err := os.ReadDir(c.SysDB)
+	epp := make(map[string]bool, len(uo.ExcludePackages))
+
+	for _, n := range uo.ExcludePackages {
+		if n != "" {
+			epp[n] = true
+		}
+	}
+
+	dd, err := os.ReadDir(c.DatabaseDir)
 
 	if err != nil {
 		return nil, err
 	}
 
-	var mx sync.Mutex
-	var wg sync.WaitGroup
+	var (
+		mx sync.Mutex
+		eg errgroup.Group
+	)
 
-	wg.Add(len(dd))
-	cc := make([]*Candidate, 0, len(dd))
+	pp := make([]*Package, 0, len(dd))
 
 	for _, de := range dd {
-		go func(n string) {
-			defer wg.Done()
+		n := de.Name()
 
-			up, err := NewPackageByName(c, Usr, n)
+		if epp[n] {
+			continue
+		}
+
+		eg.Go(func() error {
+			up, err := NewPackage(c, &PackageOptions{
+				Name: n,
+				From: Repository,
+			})
+
+			if errors.Is(err, ErrPackageNameNotFound) {
+				return nil
+			}
 
 			if err != nil {
-				return
+				return err
 			}
 
 			uv, err := up.Version()
 
 			if err != nil {
-				return
+				return err
 			}
 
-			sp, err := NewPackageByName(c, Sys, n)
+			sp, err := NewPackage(c, &PackageOptions{
+				Name: n,
+				From: Database,
+			})
 
 			if err != nil {
-				return
+				return err
 			}
 
 			sv, err := sp.Version()
 
 			if err != nil {
-				return
+				return err
 			}
 
 			if *sv == *uv {
-				return
+				return nil
 			}
 
 			mx.Lock()
 			defer mx.Unlock()
 
-			cc = append(cc, &Candidate{
-				Name: up.Name,
-			})
-		}(de.Name())
+			pp = append(pp, up)
+			return nil
+		})
 	}
 
-	wg.Wait()
-	return cc, nil
+	return pp, eg.Wait()
 }
 
-func (c *Candidate) String() string {
-	return c.Name
+func updateRepositories(rr []string) error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
+	defer stop()
+
+	for _, d := range rr {
+		rp, err := filepath.EvalSymlinks(d)
+
+		if err != nil {
+			return err
+		}
+
+		r, err := git.PlainOpenWithOptions(rp, &git.PlainOpenOptions{
+			DetectDotGit: true,
+		})
+
+		if err != nil {
+			return err
+		}
+
+		w, err := r.Worktree()
+
+		if err != nil {
+			return err
+		}
+
+		err = w.PullContext(ctx, &git.PullOptions{
+			RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
+		})
+
+		if errors.Is(err, git.NoErrAlreadyUpToDate) || errors.Is(err, git.ErrRemoteNotFound) {
+			continue
+		}
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

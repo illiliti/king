@@ -1,162 +1,142 @@
 package main
 
 import (
-	"errors"
-	"io/fs"
+	"fmt"
+	"os"
+	"path/filepath"
 
-	"github.com/illiliti/king"
+	"github.com/illiliti/king/internal/cleanup"
 	"github.com/illiliti/king/internal/log"
+
+	"github.com/cornfeedhobo/pflag"
+	"github.com/illiliti/king"
 )
 
-func update(c *king.Config) {
-	log.Running("updating repositories")
+// TODO print how many packages are built/packages in terminal title
+// TODO print elapsed time
 
-	cc, err := king.Update(c)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-
+func update(c *king.Config, td string, args []string) error {
 	var (
-		dpp []*king.Package
-		tpp []*king.Tarball
+		fs bool
+		fd bool
+		fT bool
+		fq bool
+		fn bool
 	)
 
-	mpp := make(map[string]bool)
-	epp := make([]*king.Package, 0, len(cc))
+	bo := new(king.BuildOptions)
+	uo := new(king.UpdateOptions)
+	lo := new(king.InstallOptions)
+	do := new(king.DownloadOptions)
 
-	log.Running("resolving dependencies")
+	pf := pflag.NewFlagSet("", pflag.ExitOnError)
 
-	for _, m := range cc {
-		p, err := king.NewPackageByName(c, king.Usr, m.Name)
+	pf.BoolVar(&bo.AllowInternet, "who-needs-checksums", false, "")
+	pf.StringVarP(&lo.ExtractDir, "extract-dir", "X", filepath.Join(td, "extract"), "")
+	pf.StringVarP(&bo.PackageDir, "package-dir", "P", filepath.Join(td, "pkg"), "")
+	// pf.StringVarP(&fO, "output-dir", "O", filepath.Join(cd, "logs"), "")
+	pf.StringVarP(&bo.BuildDir, "build-dir", "B", filepath.Join(td, "build"), "")
+	pf.StringVarP(&bo.Compression, "compression", "C", "", "")
+	pf.StringSliceVarP(&uo.ExcludePackages, "exclude", "x", nil, "")
+	pf.BoolVarP(&fs, "no-verify", "s", false, "")
+	pf.BoolVarP(&fd, "debug", "d", false, "")
+	pf.BoolVarP(&do.Overwrite, "force", "f", false, "")
+	pf.BoolVarP(&fn, "no-bar", "n", false, "")
+	pf.BoolVarP(&log.NoPrompt, "no-prompt", "y", os.Getenv("KISS_PROMPT") == "1", "")
+	pf.BoolVarP(&uo.NoUpdateRepositories, "no-pull", "N", false, "")
+	pf.BoolVarP(&uo.ContinueOnError, "no-error", "c", false, "")
+	pf.BoolVarP(&fT, "no-prebuilt", "T", false, "")
+	pf.BoolVarP(&fq, "quiet", "q", false, "")
 
-		if err != nil {
-			log.Fatal(err)
-		}
+	pf.SetInterspersed(true)
 
-		dd, err := p.RecursiveDepends()
+	pf.Usage = func() {
+		fmt.Fprintln(os.Stderr, updateUsage)
+	}
 
-		if err != nil && !errors.Is(err, fs.ErrNotExist) {
-			log.Fatal(err)
-		}
+	pf.Parse(args[1:])
 
-		for _, d := range dd {
-			if mpp[d.Name] {
-				continue
-			}
+	if fd {
+		lo.Debug = true
+		bo.Debug = true
+	} else {
+		// XXX
+		defer cleanup.Run(func() error {
+			return os.RemoveAll(td)
+		})()
+	}
 
-			if _, err := king.NewPackageByName(c, king.Sys, d.Name); err == nil {
-				continue
-			}
+	if !fn {
+		do.Progress = os.Stderr
+	}
 
-			p, err := king.NewPackageByName(c, king.Usr, d.Name)
+	if !fq {
+		bo.Output = os.Stdout
+	}
 
-			if err != nil {
-				log.Fatal(err)
-			}
+	log.Running("updating repositories")
 
-			t, err := p.Tarball()
+	upp, err := king.Update(c, uo)
 
-			if err != nil {
-				dpp = append(dpp, p)
-			} else {
-				tpp = append(tpp, t)
-			}
+	if err != nil {
+		return err
+	}
 
-			mpp[p.Name] = true
-		}
+	epp, dpp, tpp, err := resolveDependencies(c, upp, fT)
 
-		if !mpp[p.Name] {
-			mpp[p.Name] = true
-			epp = append(epp, p)
-		}
+	if err != nil {
+		return err
 	}
 
 	app := append(dpp, epp...)
 
-	log.Askf("proceed to build? %s", app)
+	log.Promptf("proceed to build? %s", app)
 
 	for _, p := range app {
-		ss, err := p.Sources()
-
-		if errors.Is(err, fs.ErrNotExist) {
-			continue
-		}
-
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		log.Runningf("preparing %s", p.Name)
-
-		for _, s := range ss {
-			d, ok := s.(king.Downloader)
-
-			if !ok {
-				continue
-			}
-
-			log.Runningf("downloading %s", d)
-
-			if err := d.Download(false); err != nil {
-				log.Fatal(err)
-			}
-		}
-
-		for _, s := range ss {
-			c, ok := s.(king.Checksum)
-
-			if !ok {
-				continue
-			}
-
-			log.Runningf("verifying %s", c)
-
-			if err := c.Verify(); err != nil {
-				log.Fatal(err)
-			}
+		if err := downloadSources(p, do, fs, fn); err != nil {
+			return err
 		}
 	}
 
 	for _, t := range tpp {
 		log.Runningf("installing pre-built dependency %s", t.Name)
 
-		if _, err := t.Install(c.HasForce); err != nil {
-			log.Fatal(err)
+		if _, err := t.Install(lo); err != nil {
+			return err
 		}
 	}
 
 	for _, p := range dpp {
 		log.Runningf("building dependency %s", p.Name)
 
-		t, err := p.Build()
+		t, err := p.Build(bo)
 
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 
 		log.Runningf("installing dependency %s", t.Name)
 
-		if _, err := t.Install(c.HasForce); err != nil {
-			log.Fatal(err)
+		if _, err := t.Install(lo); err != nil {
+			return err
 		}
 	}
 
 	for _, p := range epp {
 		log.Runningf("building %s", p.Name)
 
-		t, err := p.Build()
+		t, err := p.Build(bo)
 
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 
 		log.Runningf("installing %s", p.Name)
 
-		if _, err := t.Install(c.HasForce); err != nil {
-			log.Fatal(err)
+		if _, err := t.Install(lo); err != nil {
+			return err
 		}
 	}
 
-	log.Infof("processed %s", cc)
+	return nil
 }

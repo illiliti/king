@@ -1,7 +1,7 @@
 # king
 Next generation of the KISS package manager
 
-**Highly experimental, not intended for daily usage. DO NOT RUN ON REAL SYSTEM!**
+**Unstable but usable. Breakage is still possible though**
 
 ## Dependencies
 * Go >= 1.16 (build time)
@@ -17,6 +17,6 @@ go build
 # build static binary
 go build -tags 'osusergo netgo'
 
-# build static binary and strip debug symbols. best choice!
-go build -tags 'osusergo netgo' -ldflags '-s -w'
+# build static binary, strip debug symbols and trim internal paths. best choice!
+go build -tags 'osusergo netgo' -ldflags '-s -w' -trimpath
 ```

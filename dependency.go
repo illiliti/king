@@ -4,30 +4,26 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
-	"sync/atomic"
 )
+
+// TODO better docs
 
 var (
-	dependenciesCount uint32
-	dependenciesMutex sync.Mutex
-	dependencies      map[string][]string
+	ErrReverseDependenciesNotFound = errors.New("no package depends on target")
 )
 
-// Dependency represents a line of the depends file.
+// Dependency represents dependency of package.
 //
-// See https://kiss.armaanb.net/package-system#3.0
+// See https://k1sslinux.org/package-system#3.0
 type Dependency struct {
 	Name   string
 	IsMake bool
 }
 
-// Depends returns slice of Dependency pointers for a given package.
-func (p *Package) Depends() ([]*Dependency, error) {
+func (p *Package) Dependencies() ([]*Dependency, error) {
 	f, err := os.Open(filepath.Join(p.Path, "depends"))
 
 	if err != nil {
@@ -47,6 +43,10 @@ func (p *Package) Depends() ([]*Dependency, error) {
 			continue
 		}
 
+		if fi[0] == p.Name {
+			panic(fmt.Sprintf("parse %s dependencies: target depends on itself", p.Name))
+		}
+
 		dd = append(dd, &Dependency{
 			Name:   fi[0],
 			IsMake: len(fi) > 1 && fi[1] == "make",
@@ -56,25 +56,46 @@ func (p *Package) Depends() ([]*Dependency, error) {
 	return dd, sc.Err()
 }
 
-// RecursiveDepends is a recursive version of Depends() which returns
-// slice of Dependency pointers.
-func (p *Package) RecursiveDepends() ([]*Dependency, error) {
-	dd, err := p.Depends()
+func (p *Package) RecursiveDependencies() ([]*Dependency, error) {
+	return recursiveDependencies(p, "", make(map[string]bool))
+}
+
+func recursiveDependencies(p *Package, n string, mdd map[string]bool) ([]*Dependency, error) {
+	dd, err := p.Dependencies()
 
 	if err != nil {
 		return nil, err
 	}
 
+	dpp := make([]*Package, 0, len(dd))
+
 	for _, d := range dd {
-		rp, err := NewPackageByName(p.cfg, Any, d.Name)
+		if d.Name == n {
+			panic(fmt.Sprintf("parse %s dependencies: circular dependencies: [%s %s]", p.Name, d.Name, n))
+		}
+
+		if mdd[d.Name] {
+			continue
+		}
+
+		mdd[d.Name] = true
+
+		dp, err := NewPackage(p.cfg, &PackageOptions{
+			Name: d.Name,
+			From: p.From,
+		})
 
 		if err != nil {
 			return nil, err
 		}
 
-		rdd, err := rp.RecursiveDepends()
+		dpp = append(dpp, dp)
+	}
 
-		if errors.Is(err, fs.ErrNotExist) {
+	for _, dp := range dpp {
+		rdd, err := recursiveDependencies(dp, p.Name, mdd)
+
+		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}
 
@@ -82,74 +103,44 @@ func (p *Package) RecursiveDepends() ([]*Dependency, error) {
 			return nil, err
 		}
 
-		dd = append(rdd, dd...)
+		sdd := make([]*Dependency, 0, len(rdd))
+
+		for _, d := range rdd {
+			if mdd[d.Name] {
+				continue
+			}
+
+			mdd[d.Name] = true
+			sdd = append(sdd, d)
+		}
+
+		dd = append(sdd, dd...)
 	}
 
 	return dd, nil
 }
 
-// ReverseDepends is a reverse version of Depends() that iterates
-// over SysDB and returns slice of strings with no make dependencies.
-//
-// TODO allow UserDB?
-func (p *Package) ReverseDepends() ([]string, error) {
-	if err := initDependencies(p); err != nil {
-		return nil, err
+func (p *Package) ReverseDependencies() ([]string, error) {
+	if err := p.cfg.initReverseDependencies(); err != nil {
+		return nil, fmt.Errorf("initialize reverse dependencies: %w", err)
 	}
 
-	if dd, ok := dependencies[p.Name]; ok {
+	// c.ddm.Lock()
+	// defer c.ddm.Unlock()
+
+	if dd, ok := p.cfg.dd[p.Name]; ok {
 		return dd, nil
 	}
 
-	return nil, fmt.Errorf("depends %s: no reverse dependencies", p.Name)
+	return nil, fmt.Errorf("parse %s reverse dependencies: %w", p.Name, ErrReverseDependenciesNotFound)
 }
 
-func initDependencies(p *Package) error {
-	if atomic.LoadUint32(&dependenciesCount) == 1 {
-		return nil
+func (d *Dependency) String() string {
+	s := d.Name
+
+	if d.IsMake {
+		s += " make"
 	}
 
-	dependenciesMutex.Lock()
-	defer dependenciesMutex.Unlock()
-
-	if atomic.LoadUint32(&dependenciesCount) == 1 {
-		return nil
-	}
-
-	dd, err := os.ReadDir(p.cfg.SysDB)
-
-	if err != nil {
-		return err
-	}
-
-	dependencies = make(map[string][]string, len(dd))
-
-	for _, de := range dd {
-		sp, err := NewPackageByName(p.cfg, Sys, de.Name())
-
-		if err != nil {
-			return err
-		}
-
-		dd, err := sp.Depends()
-
-		if errors.Is(err, fs.ErrNotExist) {
-			continue
-		}
-
-		if err != nil {
-			return err
-		}
-
-		for _, d := range dd {
-			if d.IsMake {
-				continue
-			}
-
-			dependencies[d.Name] = append(dependencies[d.Name], sp.Name)
-		}
-	}
-
-	atomic.StoreUint32(&dependenciesCount, 1)
-	return nil
+	return s
 }

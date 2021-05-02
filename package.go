@@ -1,67 +1,82 @@
 package king
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
-	"sync"
-	"sync/atomic"
 )
 
-// PackageType represepents package type
-type PackageType uint
-
-const (
-	// Any is the same as Sys + Usr
-	Any PackageType = iota
-
-	// Sys finds package in SysDB
-	Sys
-
-	// Usr finds package in UserDB
-	Usr
-)
+// TODO better docs
 
 var (
-	pathsCount uint32
-	pathsMutex sync.Mutex
-	paths      map[string]*Package
+	ErrPackagePathNotFound = errors.New("target not owned by any package")
+	ErrPackageNameNotFound = errors.New("target not found within specified database")
 )
 
-// Package represents location to package.
+type RepositoryType uint
+
+const (
+	All RepositoryType = iota
+	Database
+	Repository
+)
+
+// Package represents package within repository or database.
 //
-// See https://kiss.armaanb.net/package-system#1.0
+// See https://k1sslinux.org/package-system#1.0
 type Package struct {
 	Name string
 	Path string
 
+	From RepositoryType
+
 	cfg *Config
 }
 
-// NewPackageByName returns a pointer to Package with appropriate type.
-func NewPackageByName(c *Config, t PackageType, n string) (*Package, error) {
-	switch t {
-	case Any:
-		return newPackage(c, n, append(c.UserDB, c.SysDB)...)
-	case Sys:
-		return newPackage(c, n, c.SysDB)
-	case Usr:
-		return newPackage(c, n, c.UserDB...)
+// PackageOptions intended to configure searching of package.
+type PackageOptions struct {
+	// Name defines package name that will be used to traverse
+	// repositories or database.
+	Name string
+
+	// Path defines path that will be used to grep manifests files
+	// within database to find owner of that path.
+	Path string
+
+	// From defines where to search package. Applies only to Name field.
+	From RepositoryType
+}
+
+// NewPackage allocates new instance of package.
+func NewPackage(c *Config, po *PackageOptions) (*Package, error) {
+	if err := po.Validate(); err != nil {
+		return nil, fmt.Errorf("validate PackageOptions: %w", err)
+	}
+
+	if po.Path != "" {
+		return newPackageByPath(c, po.Path)
+	}
+
+	switch po.From {
+	case All:
+		return newPackageByName(c, po, append(c.Repositories, c.DatabaseDir)...)
+	case Database:
+		return newPackageByName(c, po, c.DatabaseDir)
+	case Repository:
+		return newPackageByName(c, po, c.Repositories...)
 	}
 
 	panic("unreachable")
 }
 
-func newPackage(c *Config, n string, dd ...string) (*Package, error) {
-	for _, db := range dd {
-		p := filepath.Join(db, n)
+// TODO check essential files (build, manifest, ...)
+func newPackageByName(c *Config, po *PackageOptions, dd ...string) (*Package, error) {
+	for _, d := range dd {
+		p := filepath.Join(d, po.Name)
 		st, err := os.Stat(p)
 
-		if errors.Is(err, fs.ErrNotExist) {
+		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}
 
@@ -69,92 +84,49 @@ func newPackage(c *Config, n string, dd ...string) (*Package, error) {
 			return nil, err
 		}
 
+		// TODO panic()
 		if !st.IsDir() {
 			continue
 		}
 
 		return &Package{
-			Name: n,
+			Name: po.Name,
 			Path: p,
+			From: po.From,
 			cfg:  c,
 		}, nil
 	}
 
-	return nil, fmt.Errorf("package %s: not found", n)
+	return nil, fmt.Errorf("find package by name %s: %w", po.Name, ErrPackageNameNotFound)
 }
 
-// NewPackageByPath finds a package that contains
-// given path and returns a pointer to Package.
-func NewPackageByPath(c *Config, p string) (*Package, error) {
-	if err := initPaths(c); err != nil {
-		return nil, err
+// TODO fail if directory
+func newPackageByPath(c *Config, p string) (*Package, error) {
+	if err := c.initOwnedPaths(); err != nil {
+		return nil, fmt.Errorf("initialize owned paths: %w", err)
 	}
 
-	if p, ok := paths[p]; ok {
+	// c.ppm.Lock()
+	// defer c.ppm.Unlock()
+
+	if p, ok := c.pp[p]; ok {
 		return p, nil
 	}
 
-	return nil, fmt.Errorf("package %s: not owned", p)
+	return nil, fmt.Errorf("find package by path %s: %w", p, ErrPackagePathNotFound)
 }
 
-func initPaths(c *Config) error {
-	if atomic.LoadUint32(&pathsCount) == 1 {
-		return nil
+func (rt RepositoryType) String() string {
+	switch rt {
+	case Repository:
+		return "repository"
+	case Database:
+		return "database"
+	case All:
+		return "all"
 	}
 
-	pathsMutex.Lock()
-	defer pathsMutex.Unlock()
-
-	if atomic.LoadUint32(&pathsCount) == 1 {
-		return nil
-	}
-
-	dd, err := os.ReadDir(c.SysDB)
-
-	if err != nil {
-		return err
-	}
-
-	paths = make(map[string]*Package)
-
-	for _, de := range dd {
-		sp, err := NewPackageByName(c, Sys, de.Name())
-
-		if err != nil {
-			return err
-		}
-
-		f, err := os.Open(filepath.Join(sp.Path, "manifest"))
-
-		if err != nil {
-			return err
-		}
-
-		defer f.Close()
-
-		sc := bufio.NewScanner(f)
-
-		for sc.Scan() {
-			p := sc.Text()
-
-			if strings.HasSuffix(p, "/") {
-				continue
-			}
-
-			if op, ok := paths[p]; ok {
-				return fmt.Errorf("package %s: owned by %s, %s", p, op.Name, sp.Name)
-			}
-
-			paths[p] = sp
-		}
-
-		if err := sc.Err(); err != nil {
-			return err
-		}
-	}
-
-	atomic.StoreUint32(&pathsCount, 1)
-	return nil
+	panic("unreachable")
 }
 
 func (p *Package) String() string {

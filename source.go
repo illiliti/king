@@ -4,52 +4,64 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"io/fs"
 	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
-	"github.com/mholt/archiver/v3"
+	"github.com/go-git/go-git/v5/config"
+	"github.com/go-git/go-git/v5/plumbing"
 )
 
-// Source abstracts various types of sources that has ExtractDir method, which
-// returns (relative to the build directory) directory where sources should be
-// placed, and Extract method, which unpacks/downloads sources to the specified
-// directory.
-//
-// See https://kiss.armaanb.net/package-system#4.0
+// TODO better docs
+
+var (
+	ErrSourceGitSchemeInvalid  = errors.New("target scheme cannot be file")
+	ErrSourceGitHashInvalid    = errors.New("target contains invalid commit hash")
+	ErrSourceHTTPSchemeInvalid = errors.New("target scheme must be a http or https")
+	ErrSourceFileNotFound      = errors.New("target not found in relative or absolute location")
+)
+
+// Source represents package source.
+// See https://k1sslinux.org/package-system#4.0
 type Source interface {
-	ExtractDir() string
-	Extract(d string) error
+	String() string
+
+	Extractor
 }
 
-// HTTP represents http source.
+// HTTP represents source that can be downloaded.
 type HTTP struct {
-	u  string
-	p  string
-	d  string
+	URL string
+
+	ed string
+
+	cs string
 	ne bool
 
 	pkg *Package
 }
 
-// File represents absolute/relative file source.
+// File represents absolute or relative (to the path of package) file source.
 type File struct {
-	p  string
-	d  string
-	ia bool
+	Path string
+
+	ed string
 
 	pkg *Package
 }
 
 // Git represents git source.
 type Git struct {
-	u string
-	d string
+	URL string
+
+	ed string
+
+	rs []config.RefSpec
 }
 
-// Sources returns slice of Source interfaces for a given package.
+// Sources parses package sources. Lines that starts with '#' will be ignored.
 func (p *Package) Sources() ([]Source, error) {
 	f, err := os.Open(filepath.Join(p.Path, "sources"))
 
@@ -73,7 +85,7 @@ func (p *Package) Sources() ([]Source, error) {
 		var d string
 
 		if len(fi) > 1 {
-			d = fi[1]
+			d = fi[1] // TODO ban absolute path?
 		}
 
 		var s Source
@@ -88,7 +100,7 @@ func (p *Package) Sources() ([]Source, error) {
 		}
 
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("parse source %s: %w", fi[0], err)
 		}
 
 		ss = append(ss, s)
@@ -98,14 +110,47 @@ func (p *Package) Sources() ([]Source, error) {
 }
 
 func newGit(s, d string) (*Git, error) {
-	if strings.ContainsAny(s, "@#") {
-		return nil, fmt.Errorf("source %s: unsupported branch/commit")
+	u, err := url.Parse(s)
+
+	if err != nil {
+		return nil, err
 	}
 
-	return &Git{
-		u: s,
-		d: d,
-	}, nil
+	if u.Scheme == "file" {
+		return nil, ErrSourceGitSchemeInvalid
+	}
+
+	g := &Git{
+		URL: s,
+		ed:  d,
+		rs: []config.RefSpec{
+			"HEAD:HEAD",
+		},
+	}
+
+	i := strings.LastIndexAny(s, "@#")
+
+	if i < 0 {
+		return g, nil
+	}
+
+	switch s[i:][0] {
+	case '@':
+		g.rs = []config.RefSpec{
+			config.RefSpec(fmt.Sprintf("refs/heads/%s:HEAD", s[i+1:])),
+		}
+	case '#':
+		if !plumbing.IsHash(s[i+1:]) {
+			return nil, ErrSourceGitHashInvalid
+		}
+
+		g.rs = []config.RefSpec{
+			config.RefSpec(s[i+1:] + ":HEAD"),
+		}
+	}
+
+	g.URL = s[:i]
+	return g, nil
 }
 
 func newHTTP(p *Package, s, d string) (*HTTP, error) {
@@ -116,31 +161,31 @@ func newHTTP(p *Package, s, d string) (*HTTP, error) {
 	}
 
 	if u.Scheme != "http" && u.Scheme != "https" {
-		return nil, fmt.Errorf("source %s: unsupported protocol", s)
+		return nil, ErrSourceHTTPSchemeInvalid
 	}
 
-	_, ok := u.Query()["no-extract"]
+	v := u.Query()
+	_, ok := v["no-extract"]
+	v.Del("no-extract")
+	u.RawQuery = v.Encode()
 
 	return &HTTP{
-		u:   s,
-		p:   filepath.Join(p.cfg.SourceDir, p.Name, d, filepath.Base(u.Path)),
+		URL: u.String(),
+		ed:  d,
+		cs:  filepath.Join(p.cfg.SourceDir, p.Name, d, path.Base(u.EscapedPath())),
 		ne:  ok,
 		pkg: p,
 	}, nil
 }
 
 func newFile(p *Package, s, d string) (*File, error) {
-	if !fs.ValidPath(s) {
-		return nil, fmt.Errorf("source %s: invalid", s)
-	}
-
 	for _, s := range []string{
 		filepath.Join(p.Path, s),
 		filepath.Join(p.cfg.RootDir, s),
 	} {
 		_, err := os.Stat(s)
 
-		if errors.Is(err, fs.ErrNotExist) {
+		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}
 
@@ -148,27 +193,24 @@ func newFile(p *Package, s, d string) (*File, error) {
 			return nil, err
 		}
 
-		_, err = archiver.ByExtension(s)
-
 		return &File{
-			p:   s,
-			d:   d,
-			ia:  err == nil,
-			pkg: p,
+			Path: s,
+			ed:   d,
+			pkg:  p,
 		}, nil
 	}
 
-	return nil, fmt.Errorf("source %s: not found", s)
+	return nil, ErrSourceFileNotFound
 }
 
 func (g *Git) String() string {
-	return g.u
+	return g.URL
 }
 
 func (h *HTTP) String() string {
-	return h.u
+	return h.URL
 }
 
 func (f *File) String() string {
-	return f.p
+	return f.Path
 }
