@@ -62,7 +62,7 @@ func (h *HTTP) Verify() error {
 		return err
 	}
 
-	if err := verify(h.pkg, x); err != nil {
+	if err := verify(h.pkg.Path, x); err != nil {
 		return fmt.Errorf("verify HTTP source %s: %w", h.cs, err)
 	}
 
@@ -80,15 +80,15 @@ func (f *File) Verify() error {
 		return err
 	}
 
-	if err := verify(f.pkg, x); err != nil {
+	if err := verify(f.pkg.Path, x); err != nil {
 		return fmt.Errorf("verify File source %s: %w", f.Path, err)
 	}
 
 	return nil
 }
 
-func verify(p *Package, x string) error {
-	es, err := checksums.Open(filepath.Join(p.Path, "checksums"), os.O_RDONLY)
+func verify(p, x string) error {
+	es, err := checksums.Open(filepath.Join(p, "checksums"), os.O_RDONLY)
 
 	if err != nil {
 		return err
