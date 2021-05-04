@@ -109,11 +109,11 @@ func (a *Alternative) Swap() (*Alternative, error) {
 
 	ap := strings.ReplaceAll(a.Path, "/", ">")
 
-	if err := swap(cp, a.Path, filepath.Join(a.cfg.AlternativeDir, cp.Name+ap), true); err != nil {
+	if err := swap(cp, a.Path, filepath.Join(a.cfg.ad, cp.Name+ap), true); err != nil {
 		return nil, fmt.Errorf("swap path %s: %w", a.Path, err)
 	}
 
-	if err := swap(sp, filepath.Join(a.cfg.AlternativeDir, sp.Name+ap), a.Path, false); err != nil {
+	if err := swap(sp, filepath.Join(a.cfg.ad, sp.Name+ap), a.Path, false); err != nil {
 		return nil, fmt.Errorf("swap path %s: %w", a.Path, err)
 	}
 
@@ -138,9 +138,9 @@ func swap(p *Package, s, d string, ad bool) error {
 	mf.Replace(s, d)
 
 	if ad {
-		mf.Insert(p.cfg.AlternativeDir + "/")
+		mf.Insert(p.cfg.ad + "/")
 	} else {
-		mf.Delete(p.cfg.AlternativeDir + "/")
+		mf.Delete(p.cfg.ad + "/")
 	}
 
 	if err := mf.Flush(); err != nil {
