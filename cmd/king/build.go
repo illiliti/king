@@ -104,9 +104,7 @@ func build(c *king.Config, td string, args []string) error {
 
 	app := append(dpp, epp...)
 
-	if len(dpp) > 0 {
-		log.Promptf("proceed to build? %s", app)
-	}
+	log.Promptf("proceed to build? %s", app)
 
 	for _, p := range app {
 		if err := downloadSources(p, do, fs, fn); err != nil {
