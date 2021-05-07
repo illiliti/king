@@ -24,15 +24,16 @@ func Run(f func() error) func() {
 			panic(err)
 		}
 
-		var c int
+		// https://pubs.opengroup.org/onlinepubs/9699919799/xrat/V4_xcu_chap02.html#tag_18_08_02
+		c := 128
 
 		// TODO according to POSIX/ISO C, signal code is implementation-defined
 		// and we need more portable way to exit with corresponding signal code
 		switch s {
 		case os.Kill:
-			c = 15
+			c += 15
 		case os.Interrupt:
-			c = 2
+			c += 2
 		}
 
 		os.Exit(c)
