@@ -243,6 +243,8 @@ func updateDepends(bp *Package, pd, pdp string) error {
 			return nil
 		}
 
+		defer f.Close()
+
 		ll, err := f.ImportedLibraries()
 
 		if err != nil {
