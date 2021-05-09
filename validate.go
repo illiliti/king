@@ -9,6 +9,16 @@ import (
 
 // TODO better docs
 
+var compressFormat = map[string]bool{
+	"sz":  true,
+	"br":  true,
+	"gz":  true,
+	"xz":  true,
+	"zst": true,
+	"bz2": true,
+	"lz4": true,
+}
+
 // type ValidateError struct { // TODO
 
 // }
@@ -56,16 +66,6 @@ func (ao *AlternativeOptions) Validate() error {
 }
 
 func (bo *BuildOptions) Validate() error {
-	compressFormat := map[string]bool{
-		"sz":  true,
-		"br":  true,
-		"gz":  true,
-		"xz":  true,
-		"zst": true,
-		"bz2": true,
-		"lz4": true,
-	}
-
 	if bo.Compression == "" {
 		bo.Compression = "gz"
 	}

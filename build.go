@@ -23,6 +23,19 @@ import (
 // TODO unit tests
 // TODO better docs
 
+var systemLibrary = map[string]bool{
+	"c":       true,
+	"m":       true,
+	"dl":      true,
+	"rt":      true,
+	"xnet":    true,
+	"util":    true,
+	"trace":   true,
+	"crypt":   true,
+	"resolv":  true,
+	"pthread": true,
+}
+
 // BuildOptions provides facilities for building package.
 type BuildOptions struct {
 	// NoStripBinaries disables discarding unnecessary symbols
@@ -211,19 +224,6 @@ func removeGarbage(pd string) error {
 }
 
 func updateDepends(bp *Package, pd, pdp string) error {
-	systemLibrary := map[string]bool{
-		"c":       true,
-		"m":       true,
-		"dl":      true,
-		"rt":      true,
-		"xnet":    true,
-		"util":    true,
-		"trace":   true,
-		"crypt":   true,
-		"resolv":  true,
-		"pthread": true,
-	}
-
 	dd := make(map[string]bool)
 
 	// TODO only /usr/{lib,bin}
