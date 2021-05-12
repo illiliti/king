@@ -19,7 +19,6 @@ func remove(c *king.Config, args []string) error {
 	pf := pflag.NewFlagSet("", pflag.ExitOnError)
 
 	pf.BoolVarP(&ro.NoCheckReverseDependencies, "force", "f", os.Getenv("KISS_FORCE") == "1", "")
-	pf.BoolVarP(&ro.NoSwapAlternatives, "no-swap", "a", false, "")
 	pf.BoolVarP(&ro.RemoveEtcFiles, "remove-etc", "e", false, "")
 	pf.BoolVarP(&fr, "recursive", "r", false, "")
 

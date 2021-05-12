@@ -27,10 +27,6 @@ type RemoveOptions struct {
 	// installed packages depends on it.
 	NoCheckReverseDependencies bool
 
-	// NoSwapAlternatives disables auto-swapping dangling
-	// alternatives. Useful for debugging purposes
-	NoSwapAlternatives bool
-
 	// RemoveEtcFiles forcefully removes /etc/* files without special handling
 	RemoveEtcFiles bool
 }
@@ -50,10 +46,8 @@ func (p *Package) Remove(ro *RemoveOptions) error {
 		return err
 	}
 
-	if !ro.NoSwapAlternatives {
-		if err := swapAlternatives(p, mf); err != nil {
-			return fmt.Errorf("swap alternatives: %w", err)
-		}
+	if err := swapAlternatives(p, mf); err != nil {
+		return fmt.Errorf("swap alternatives: %w", err)
 	}
 
 	defer p.cfg.ResetOwnedPaths()

@@ -116,7 +116,6 @@ example:
 
 option:
     -f, --force       remove package even if other packages depend on it
-    -a, --no-swap     disable auto-swapping dangling alternatives
     -e, --remove-etc  remove /etc/* files without special handling
     -r, --recursive   recursively remove dependencies
     -h, --help        print help message
