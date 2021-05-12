@@ -1,12 +1,10 @@
 package download
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"os/signal"
 	"path/filepath"
 
 	"github.com/dustin/go-humanize"
@@ -33,17 +31,9 @@ func (p *progress) Flush() error {
 	return err
 }
 
+// TODO remove file if download fails
 func Download(s, d string, w io.Writer) error {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
-	defer stop()
-
-	rq, err := http.NewRequestWithContext(ctx, http.MethodGet, s, nil)
-
-	if err != nil {
-		return err
-	}
-
-	rp, err := http.DefaultClient.Do(rq)
+	rp, err := http.Get(s)
 
 	if err != nil {
 		return err

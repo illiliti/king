@@ -1,11 +1,9 @@
 package king
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"sync"
 
@@ -117,9 +115,6 @@ func Update(c *Config, uo *UpdateOptions) ([]*Package, error) {
 }
 
 func updateRepositories(rr []string) error {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
-	defer stop()
-
 	for _, d := range rr {
 		rp, err := filepath.EvalSymlinks(d)
 
@@ -141,7 +136,7 @@ func updateRepositories(rr []string) error {
 			return err
 		}
 
-		err = w.PullContext(ctx, &git.PullOptions{
+		err = w.Pull(&git.PullOptions{
 			RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
 		})
 

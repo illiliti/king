@@ -1,10 +1,8 @@
 package king
 
 import (
-	"context"
 	"fmt"
 	"os"
-	"os/signal"
 
 	"github.com/illiliti/king/internal/archive"
 	"github.com/illiliti/king/internal/cp"
@@ -38,9 +36,6 @@ func (g *Git) Extract(d string) error {
 }
 
 func gitFetch(s, d string, rs []config.RefSpec) error {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, os.Kill)
-	defer stop()
-
 	r, err := git.PlainInit(d, false)
 
 	if err != nil {
@@ -56,7 +51,7 @@ func gitFetch(s, d string, rs []config.RefSpec) error {
 		return err
 	}
 
-	err = u.FetchContext(ctx, &git.FetchOptions{
+	err = u.Fetch(&git.FetchOptions{
 		RefSpecs: rs,
 		Depth:    1,
 		Tags:     git.AllTags,
