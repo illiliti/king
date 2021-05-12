@@ -10,6 +10,7 @@ import (
 
 // TODO test package with multiple sources that may overlap
 // TODO test copy empty directories
+// TODO test git fetch commit/branch
 func TestExtract(t *testing.T) {
 	t.Parallel()
 
@@ -64,6 +65,14 @@ func TestExtract(t *testing.T) {
 			test:  "ExtractHTTPWithExtractDir",
 			check: "regular_file",
 		},
+		{
+			test:  "FetchGit",
+			check: "ssu.c",
+		},
+		{
+			test:  "FetchGitWithExtractDir",
+			check: "ssu.c",
+		},
 	}
 
 	for _, s := range ss {
@@ -88,6 +97,10 @@ func TestExtract(t *testing.T) {
 			}
 
 			d := filepath.Join(t.TempDir(), ss[0].ExtractDir())
+
+			if _, ok := ss[0].(*king.Git); ok && testing.Short() {
+				t.Skipf("skipping test %s that uses network", s.test)
+			}
 
 			err = ss[0].Extract(d)
 
