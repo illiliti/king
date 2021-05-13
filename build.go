@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/illiliti/king/internal/archive"
 	"github.com/illiliti/king/internal/cleanup"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/illiliti/king/etcsums"
 	"github.com/illiliti/king/manifest"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sys/unix"
 )
 
@@ -104,6 +106,7 @@ func (p *Package) Build(bo *BuildOptions) (*Tarball, error) {
 		}
 	}
 
+	// TODO use context.Context in BuildOptions to allow flexible control?
 	if !bo.Debug {
 		defer cleanup.Run(func() error {
 			for _, d := range []string{bd, pd} {
@@ -224,10 +227,14 @@ func removeGarbage(pd string) error {
 }
 
 func updateDepends(bp *Package, pd, pdp string) error {
+	var (
+		mx sync.Mutex
+		eg errgroup.Group
+	)
+
 	dd := make(map[string]bool)
 
 	// TODO only /usr/{lib,bin}
-	// TODO parallel
 	err := filepath.WalkDir(pd, func(p string, de os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -237,53 +244,63 @@ func updateDepends(bp *Package, pd, pdp string) error {
 			return nil
 		}
 
-		f, err := elf.Open(p)
-
-		if err != nil {
-			return nil
-		}
-
-		defer f.Close()
-
-		ll, err := f.ImportedLibraries()
-
-		if err != nil {
-			return nil
-		}
-
-		for _, l := range ll {
-			i := strings.Index(l, ".")
-
-			if i > 3 && systemLibrary[l[3:i]] {
-				continue
-			}
-
-			// TODO stop hardcoding /usr/lib
-			// use LD_LIBRARY_PATH, DT_RUNPATH, DT_RPATH, /etc/ld.so.conf, /etc/ld-musl-<arch>.path
-			// https://cgit.uclibc-ng.org/cgi/cgit/uclibc-ng.git/tree/utils/ldd.c?id=672a303852353ba9299f6f50190fca8b3abe4c1d#n489
-			sp, err := NewPackage(bp.cfg, &PackageOptions{
-				Path: filepath.Join("/usr/lib", l),
-			})
-
-			if errors.Is(err, ErrPackagePathNotFound) {
-				continue
-			}
+		eg.Go(func() error {
+			f, err := elf.Open(p)
 
 			if err != nil {
-				return err
+				return nil
 			}
 
-			if sp.Name == bp.Name {
-				continue
+			defer f.Close()
+
+			ll, err := f.ImportedLibraries()
+
+			if err != nil {
+				return nil
 			}
 
-			if _, ok := dd[sp.Name]; !ok {
-				dd[sp.Name] = false
+			for _, l := range ll {
+				i := strings.Index(l, ".")
+
+				if i > 3 && systemLibrary[l[3:i]] {
+					continue
+				}
+
+				// TODO stop hardcoding /usr/lib
+				// use LD_LIBRARY_PATH, DT_RUNPATH, DT_RPATH, /etc/ld.so.conf, /etc/ld-musl-<arch>.path
+				// https://cgit.uclibc-ng.org/cgi/cgit/uclibc-ng.git/tree/utils/ldd.c?id=672a303852353ba9299f6f50190fca8b3abe4c1d#n489
+				sp, err := NewPackage(bp.cfg, &PackageOptions{
+					Path: filepath.Join("/usr/lib", l),
+				})
+
+				if errors.Is(err, ErrPackagePathNotFound) {
+					continue
+				}
+
+				if err != nil {
+					return err
+				}
+
+				if sp.Name == bp.Name {
+					continue
+				}
+
+				mx.Lock()
+				if _, ok := dd[sp.Name]; !ok {
+					dd[sp.Name] = false
+				}
+				mx.Unlock()
 			}
-		}
+
+			return nil
+		})
 
 		return nil
 	})
+
+	if err := eg.Wait(); err != nil {
+		return err
+	}
 
 	if err != nil {
 		return err
