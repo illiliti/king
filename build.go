@@ -244,26 +244,28 @@ func updateDepends(bp *Package, pd, pdp string) error {
 			return nil
 		}
 
-		eg.Go(func() error {
-			f, err := elf.Open(p)
+		f, err := elf.Open(p)
 
-			if err != nil {
-				return nil
-			}
+		if err != nil {
+			return nil
+		}
 
-			defer f.Close()
+		defer f.Close()
 
-			ll, err := f.ImportedLibraries()
+		ll, err := f.ImportedLibraries()
 
-			if err != nil {
-				return nil
-			}
+		if err != nil {
+			return nil
+		}
 
-			for _, l := range ll {
+		for _, l := range ll {
+			l := l // HACK
+
+			eg.Go(func() error {
 				i := strings.Index(l, ".")
 
 				if i > 3 && systemLibrary[l[3:i]] {
-					continue
+					return nil
 				}
 
 				// TODO stop hardcoding /usr/lib
@@ -274,7 +276,7 @@ func updateDepends(bp *Package, pd, pdp string) error {
 				})
 
 				if errors.Is(err, ErrPackagePathNotFound) {
-					continue
+					return nil
 				}
 
 				if err != nil {
@@ -282,18 +284,19 @@ func updateDepends(bp *Package, pd, pdp string) error {
 				}
 
 				if sp.Name == bp.Name {
-					continue
+					return nil
 				}
 
 				mx.Lock()
+				defer mx.Unlock()
+
 				if _, ok := dd[sp.Name]; !ok {
 					dd[sp.Name] = false
 				}
-				mx.Unlock()
-			}
 
-			return nil
-		})
+				return nil
+			})
+		}
 
 		return nil
 	})
@@ -362,6 +365,7 @@ func updateDepends(bp *Package, pd, pdp string) error {
 }
 
 func createEtcsums(pd, pdp string) error {
+	// XXX
 	st, err := os.Lstat(filepath.Join(pd, "etc"))
 
 	if errors.Is(err, os.ErrNotExist) {
@@ -382,6 +386,7 @@ func createEtcsums(pd, pdp string) error {
 		return err
 	}
 
+	// XXX
 	if err := es.Generate(filepath.Join(pd, "etc")); err != nil {
 		return err
 	}
