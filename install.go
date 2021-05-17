@@ -195,12 +195,16 @@ func handleAlternatives(t *Tarball, emf *manifest.Manifest, ed string) error {
 	cc := make([]string, 0, len(pp))
 
 	for _, p := range pp {
+		if strings.HasSuffix(p, "/") {
+			continue
+		}
+
 		sp, err := NewPackage(t.cfg, &PackageOptions{
 			Path: p,
 		})
 
 		if errors.Is(err, ErrPackagePathNotFound) {
-			return nil
+			continue
 		}
 
 		if err != nil {
@@ -218,12 +222,12 @@ func handleAlternatives(t *Tarball, emf *manifest.Manifest, ed string) error {
 		return nil
 	}
 
-	if err := os.MkdirAll(filepath.Join(ed, t.cfg.db), 0777); err != nil {
+	if err := os.MkdirAll(filepath.Join(ed, t.cfg.ad), 0777); err != nil {
 		return err
 	}
 
 	for _, c := range cc {
-		a := filepath.Join(t.cfg.db, t.Name+strings.ReplaceAll(c, "/", ">"))
+		a := filepath.Join(t.cfg.ad, t.Name+strings.ReplaceAll(c, "/", ">"))
 
 		if err := os.Rename(filepath.Join(ed, c), filepath.Join(ed, a)); err != nil {
 			return err

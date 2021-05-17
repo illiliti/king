@@ -17,7 +17,7 @@ var (
 	ErrAlternativeNotFound = errors.New("conflict has not been occured yet")
 )
 
-// Alternative represents conflict within multiple packages.
+// Alternative represents conflict between multiple packages.
 //
 // See https://k1sslinux.org/package-manager#3.2
 type Alternative struct {
@@ -44,9 +44,15 @@ func NewAlternative(c *Config, ao *AlternativeOptions) (*Alternative, error) {
 	}
 
 	for _, a := range aa {
-		if a.Path == ao.Path {
-			return a, nil
+		if a.Path != ao.Path {
+			continue
 		}
+
+		if ao.Name != "" && a.Name != ao.Name {
+			continue
+		}
+
+		return a, nil
 	}
 
 	return nil, fmt.Errorf("find alternative %s: %w", ao.Path, ErrAlternativeNotFound)

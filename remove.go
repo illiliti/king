@@ -78,12 +78,20 @@ func unresolvedDependencies(p *Package) error {
 
 func swapAlternatives(p *Package, mf *manifest.Manifest) error {
 	for _, r := range mf.Sort(manifest.NoSort) {
+		if strings.HasSuffix(r, "/") {
+			continue
+		}
+
 		a, err := NewAlternative(p.cfg, &AlternativeOptions{
 			Path: r,
 		})
 
-		if err != nil {
+		if errors.Is(err, ErrAlternativeNotFound) {
 			continue
+		}
+
+		if err != nil {
+			return err
 		}
 
 		if a.Name == p.Name {
