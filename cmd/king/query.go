@@ -408,14 +408,15 @@ func queryReverseDependencies(c *king.Config, w io.Writer, n string) error {
 }
 
 func queryOwner(c *king.Config, w io.Writer, p string) error {
-	rp, err := filepath.EvalSymlinks(p)
+	d, n := filepath.Split(p)
+	rd, err := filepath.EvalSymlinks(d)
 
 	if err != nil {
 		return err
 	}
 
 	sp, err := king.NewPackage(c, &king.PackageOptions{
-		Path: rp,
+		Path: filepath.Join(rd, n),
 	})
 
 	if err != nil {
