@@ -258,7 +258,7 @@ func querySize(c *king.Config, w io.Writer, n string) error {
 			continue
 		}
 
-		st, err := os.Lstat(p)
+		st, err := os.Lstat(filepath.Join(c.RootDir, p))
 
 		if err != nil {
 			return err
