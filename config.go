@@ -152,10 +152,14 @@ func (c *Config) initOwnedPaths() error {
 				}
 
 				mx.Lock()
-				if op, ok := c.pp[p]; ok {
+				op, ok := c.pp[p]
+				mx.Unlock()
+
+				if ok {
 					return fmt.Errorf("parse %s path: %w: [%s %s]", p, errMultipleOwners, op.Name, sp.Name)
 				}
 
+				mx.Lock()
 				c.pp[p] = sp
 				mx.Unlock()
 			}
