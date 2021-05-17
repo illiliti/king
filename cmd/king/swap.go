@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/illiliti/king/internal/log"
@@ -54,14 +55,21 @@ func swap(c *king.Config, args []string) error {
 }
 
 func parseAlternatives(c *king.Config, n string, args []string) ([]*king.Alternative, error) {
+	// TODO ban args > 1 if args[0] == "-"
 	if len(args) > 0 && args[0] != "-" {
 		aa := make([]*king.Alternative, 0, len(args))
 
-		// TODO resolve symlinks
 		for _, p := range args {
+			ad, an := filepath.Split(p)
+			rad, err := filepath.EvalSymlinks(ad)
+
+			if err != nil {
+				return nil, err
+			}
+
 			a, err := king.NewAlternative(c, &king.AlternativeOptions{
 				Name: n,
-				Path: p,
+				Path: filepath.Join(rad, an),
 			})
 
 			if err != nil {
@@ -91,6 +99,7 @@ func parseAlternatives(c *king.Config, n string, args []string) ([]*king.Alterna
 	for sc.Scan() {
 		fi := strings.Fields(sc.Text())
 
+		// TODO return err
 		if len(fi) < 2 || fi[0][0] == '#' {
 			continue
 		}
