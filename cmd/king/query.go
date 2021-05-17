@@ -173,10 +173,14 @@ func listRepositories(c *king.Config, w io.Writer) error {
 }
 
 func listAlternatives(c *king.Config, w io.Writer, args []string) error {
-	pp := make(map[string]bool, len(args))
+	var pp map[string]bool
 
-	for _, n := range args {
-		pp[n] = true
+	if len(args) > 0 {
+		pp = make(map[string]bool, len(args))
+
+		for _, n := range args {
+			pp[n] = true
+		}
 	}
 
 	aa, err := king.Alternatives(c)
