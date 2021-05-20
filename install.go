@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/illiliti/king/internal/archive"
-	"github.com/illiliti/king/internal/cleanup"
 	"github.com/illiliti/king/internal/cp"
 	"github.com/illiliti/king/internal/hash"
 
@@ -64,9 +63,7 @@ func (t *Tarball) Install(lo *InstallOptions) (*Package, error) {
 	}
 
 	if !lo.Debug {
-		defer cleanup.Run(func() error {
-			return os.RemoveAll(ed)
-		})()
+		defer os.RemoveAll(ed)
 	}
 
 	if err := archive.Extract(t.Path, ed, 0); err != nil {
