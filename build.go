@@ -13,7 +13,6 @@ import (
 	"sync"
 
 	"github.com/illiliti/king/internal/archive"
-	"github.com/illiliti/king/internal/cleanup"
 	"github.com/illiliti/king/internal/cp"
 
 	"github.com/illiliti/king/etcsums"
@@ -106,23 +105,16 @@ func (p *Package) Build(bo *BuildOptions) (*Tarball, error) {
 		}
 	}
 
-	// TODO use context.Context in BuildOptions to allow flexible control?
 	if !bo.Debug {
-		defer cleanup.Run(func() error {
-			for _, d := range []string{bd, pd} {
-				if err := os.RemoveAll(d); err != nil {
-					return err
-				}
-			}
-
-			return nil
-		})()
+		defer os.RemoveAll(bd)
+		defer os.RemoveAll(pd)
 	}
 
 	// TODO add a way to reuse bo.BuildDir, i.e skip this loop if bo.ReuseBuildDir defined
 	for _, s := range ss {
 		d := filepath.Join(bd, s.ExtractDir())
 
+		// TODO drop
 		if err := os.MkdirAll(d, 0777); err != nil {
 			return nil, err
 		}
