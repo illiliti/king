@@ -82,6 +82,11 @@ func update(c *king.Config, td string, args []string) error {
 		return err
 	}
 
+	if len(upp) == 0 {
+		log.Info("no one package needing update")
+		return nil
+	}
+
 	epp, dpp, tpp, err := resolveDependencies(c, upp, fT)
 
 	if err != nil {
