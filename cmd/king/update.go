@@ -75,7 +75,9 @@ func update(c *king.Config, td string, args []string) error {
 		bo.Output = os.Stdout
 	}
 
-	log.Running("updating repositories")
+	if !uo.NoUpdateRepositories {
+		log.Running("updating repositories")
+	}
 
 	upp, err := king.Update(c, uo)
 
