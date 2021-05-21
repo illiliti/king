@@ -10,9 +10,7 @@ import (
 
 // TODO better docs
 
-var (
-	ErrVersionInvalid = errors.New("target must contain only two fields")
-)
+var ErrVersionInvalid = errors.New("target must contain only two fields")
 
 // Version represents content of the version file.
 //
@@ -44,5 +42,5 @@ func (p *Package) Version() (*Version, error) {
 }
 
 func (v *Version) String() string {
-	return v.Version + " " + v.Release
+	return v.Version + "-" + v.Release
 }
