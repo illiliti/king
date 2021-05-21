@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"text/tabwriter"
 
 	"github.com/illiliti/king/internal/cleanup"
 	"github.com/illiliti/king/internal/log"
@@ -93,11 +94,42 @@ func update(c *king.Config, td string, args []string) error {
 		return err
 	}
 
-	app := append(dpp, epp...)
+	w := tabwriter.NewWriter(os.Stderr, 0, 0, 3, ' ', 0) // TODO doc
 
-	log.Promptf("proceed to build? %s", app)
+	// TODO tree?
+	// TODO show old versions
 
-	for _, p := range app {
+	fmt.Fprint(w, "<package>\t<new version>\t<subtype>\t<action>\n")
+
+	for _, p := range epp {
+		v, err := p.Version()
+
+		if err != nil {
+			return err
+		}
+
+		fmt.Fprint(w, p.Name+"\t", v.String()+"\t", "candidate\t", "update\n")
+	}
+
+	for _, p := range dpp {
+		v, err := p.Version()
+
+		if err != nil {
+			return err
+		}
+
+		// TODO print make dependency
+		fmt.Fprint(w, p.Name+"\t", v.String()+"\t", "dependency\t", "build, install\n")
+	}
+
+	for _, t := range tpp {
+		fmt.Fprint(w, t.Name+"\t", "pre-built dependency\t", "install\n")
+	}
+
+	w.Flush()
+	log.Prompt("proceed to update?")
+
+	for _, p := range append(dpp, epp...) {
 		if err := downloadSources(p, do, fs, fn); err != nil {
 			return err
 		}

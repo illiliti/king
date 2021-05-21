@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"text/tabwriter"
 
 	"github.com/illiliti/king/internal/cleanup"
 	"github.com/illiliti/king/internal/log"
@@ -102,11 +103,36 @@ func build(c *king.Config, td string, args []string) error {
 		return err
 	}
 
-	app := append(dpp, epp...)
+	if len(dpp) > 0 || len(tpp) > 0 {
+		// TODO tree?
+		w := tabwriter.NewWriter(os.Stderr, 0, 0, 3, ' ', 0) // TODO doc
 
-	log.Promptf("proceed to build? %s", app)
+		fmt.Fprint(w, "<package>\t<subtype>\t<action>\n")
 
-	for _, p := range app {
+		for _, p := range epp {
+			fmt.Fprint(w, p.Name+"\t", "candidate\t", "build")
+
+			if fi {
+				fmt.Fprint(w, ", install")
+			}
+
+			fmt.Fprint(w, "\n")
+		}
+
+		for _, p := range dpp {
+			// TODO print make dependency
+			fmt.Fprint(w, p.Name+"\t", "dependency\t", "build, install\n")
+		}
+
+		for _, t := range tpp {
+			fmt.Fprint(w, t.Name+"\t", "pre-built dependency\t", "install\n")
+		}
+
+		w.Flush()
+		log.Prompt("proceed to build?")
+	}
+
+	for _, p := range append(dpp, epp...) {
 		if err := downloadSources(p, do, fs, fn); err != nil {
 			return err
 		}
