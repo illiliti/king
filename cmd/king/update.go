@@ -32,7 +32,6 @@ func update(c *king.Config, td string, args []string) error {
 
 	pf := pflag.NewFlagSet("", pflag.ExitOnError)
 
-	pf.BoolVar(&bo.AllowInternet, "who-needs-checksums", false, "")
 	pf.StringVarP(&lo.ExtractDir, "extract-dir", "X", filepath.Join(td, "extract"), "")
 	pf.StringVarP(&bo.PackageDir, "package-dir", "P", filepath.Join(td, "pkg"), "")
 	// pf.StringVarP(&fO, "output-dir", "O", filepath.Join(cd, "logs"), "")

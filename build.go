@@ -18,7 +18,6 @@ import (
 	"github.com/illiliti/king/etcsums"
 	"github.com/illiliti/king/manifest"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/sys/unix"
 )
 
 // TODO unit tests
@@ -43,15 +42,6 @@ type BuildOptions struct {
 	// from binaries and libraries.
 	//
 	// NoStripBinaries bool
-
-	// BuildChroot builds package in isolated chroot environment.
-	//
-	// BuildChroot bool
-
-	// AllowInternet allows internet connection which is forbidden by default.
-	//
-	// This feature has no effect on non-linux platforms.
-	AllowInternet bool
 
 	// Output points where build log will be written.
 	Output io.Writer
@@ -128,28 +118,6 @@ func (p *Package) Build(bo *BuildOptions) (*Tarball, error) {
 	cmd.Stdout = bo.Output
 	cmd.Stderr = bo.Output
 	cmd.Dir = bd
-
-	// TODO use no_new_privs
-	// TODO use https://landlock.io in future
-	// TODO check if kernel supports CONFIG_NET_NS/CONFIG_USER_NS before doing anything
-	//
-	// /proc/self/ns/net
-	// /proc/self/ns/user
-	//
-	// https://github.com/golang/go/commit/48cc3c4b587f9549f7426776d032da99b3ba471b
-	if !bo.AllowInternet {
-		// naively create empty network namespace and
-		// hope that no one will escape from it...
-		cmd.SysProcAttr = &unix.SysProcAttr{
-			Cloneflags: unix.CLONE_NEWNET,
-		}
-
-		// TODO handle CLONE_NEWUSER inside chroot.
-		// if caller inside chroot and has [E]UID > 0, clone(2) will return EPERM.
-		if os.Geteuid() > 0 {
-			cmd.SysProcAttr.Cloneflags |= unix.CLONE_NEWUSER
-		}
-	}
 
 	if err := cmd.Run(); err != nil {
 		return nil, fmt.Errorf("execute build: %w", err)

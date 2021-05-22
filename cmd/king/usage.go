@@ -54,7 +54,6 @@ example:
 	buildUsage = `usage: king build [option]... <package>...
 
 option:
-    --who-needs-checksums    allow internet connection during build
     -X, --extract-dir <dir>  set directory where pre-built packages will be extracted
     -P, --package-dir <dir>  set directory where package will be turned into tarball
     -B, --build-dir   <dir>  set directory where sources will be extracted
@@ -78,7 +77,6 @@ example:
 	updateUsage = `usage: king update [option]...
 
 option:
-    --who-needs-checksums    allow internet connection during build
     -X, --extract-dir <dir>  set directory where pre-built packages will be extracted
     -P, --package-dir <dir>  set directory where packages will be turned into tarballs
     -B, --build-dir   <dir>  set directory where sources will be extracted

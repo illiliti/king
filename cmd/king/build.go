@@ -34,7 +34,6 @@ func build(c *king.Config, td string, args []string) error {
 	pf := pflag.NewFlagSet("", pflag.ExitOnError)
 
 	// TODO we need structure-based flag parser at some point to avoid this mess
-	pf.BoolVar(&bo.AllowInternet, "who-needs-checksums", false, "")
 	pf.StringVarP(&lo.ExtractDir, "extract-dir", "X", filepath.Join(td, "extract"), "")
 	pf.StringVarP(&bo.PackageDir, "package-dir", "P", filepath.Join(td, "pkg"), "")
 	// pf.StringVarP(&fO, "output-dir", "O", filepath.Join(cd, "logs"), "")
