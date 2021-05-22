@@ -11,6 +11,8 @@ import (
 
 // TODO better docs
 
+var NoErrDownloadAlreadyDownloaded = errors.New("target already downloaded")
+
 type Downloader interface {
 	Download(do *DownloadOptions) error
 }
@@ -29,7 +31,7 @@ func (h *HTTP) Download(do *DownloadOptions) error {
 		_, err := os.Stat(h.cs)
 
 		if err == nil {
-			return nil
+			return fmt.Errorf("download HTTP source %s: %w", h.URL, NoErrDownloadAlreadyDownloaded)
 		}
 
 		if !errors.Is(err, os.ErrNotExist) {
