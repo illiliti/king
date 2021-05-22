@@ -101,16 +101,10 @@ func update(c *king.Config, td string, args []string) error {
 	// TODO tree?
 	// TODO show old versions
 
-	fmt.Fprint(w, "<package>\t<new version>\t<subtype>\t<action>\n")
+	fmt.Fprint(w, "<package>\t<new version>\t<type>\t<action>\n")
 
-	for _, p := range epp {
-		v, err := p.Version()
-
-		if err != nil {
-			return err
-		}
-
-		fmt.Fprint(w, p.Name+"\t", v.String()+"\t", "candidate\t", "update\n")
+	for _, t := range tpp {
+		fmt.Fprint(w, t.Name+"\t", "pre-built dependency\t", "install\n")
 	}
 
 	for _, p := range dpp {
@@ -121,11 +115,17 @@ func update(c *king.Config, td string, args []string) error {
 		}
 
 		// TODO print make dependency
-		fmt.Fprint(w, p.Name+"\t", v.String()+"\t", "dependency\t", "build, install\n")
+		fmt.Fprint(w, p.Name+"\t", v.String()+"\t", "dependency\t", "build && install\n")
 	}
 
-	for _, t := range tpp {
-		fmt.Fprint(w, t.Name+"\t", "pre-built dependency\t", "install\n")
+	for _, p := range epp {
+		v, err := p.Version()
+
+		if err != nil {
+			return err
+		}
+
+		fmt.Fprint(w, p.Name+"\t", v.String()+"\t", "candidate\t", "update\n")
 	}
 
 	w.Flush()
@@ -140,6 +140,8 @@ func update(c *king.Config, td string, args []string) error {
 	for _, t := range tpp {
 		log.Runningf("installing pre-built dependency %s", t.Name)
 
+		// TODO forcefully install
+		// https://github.com/kiss-community/kiss/blob/edfb25aa2da44076dcb35b19f8e6cfddd5a66dfa/kiss#L659
 		if _, err := t.Install(lo); err != nil {
 			return err
 		}

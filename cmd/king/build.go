@@ -16,7 +16,6 @@ import (
 
 // TODO print how many packages are built/building in terminal title
 // TODO print elapsed time
-// TODO merge build and update code
 
 func build(c *king.Config, td string, args []string) error {
 	var (
@@ -107,25 +106,25 @@ func build(c *king.Config, td string, args []string) error {
 		// TODO tree?
 		w := tabwriter.NewWriter(os.Stderr, 0, 0, 3, ' ', 0) // TODO doc
 
-		fmt.Fprint(w, "<package>\t<subtype>\t<action>\n")
+		fmt.Fprint(w, "<package>\t<type>\t<action>\n")
+
+		for _, t := range tpp {
+			fmt.Fprint(w, t.Name+"\t", "pre-built dependency\t", "install\n")
+		}
+
+		for _, p := range dpp {
+			// TODO print make dependency
+			fmt.Fprint(w, p.Name+"\t", "dependency\t", "build && install\n")
+		}
 
 		for _, p := range epp {
 			fmt.Fprint(w, p.Name+"\t", "candidate\t", "build")
 
 			if fi {
-				fmt.Fprint(w, ", install")
+				fmt.Fprint(w, "&& install")
 			}
 
 			fmt.Fprint(w, "\n")
-		}
-
-		for _, p := range dpp {
-			// TODO print make dependency
-			fmt.Fprint(w, p.Name+"\t", "dependency\t", "build, install\n")
-		}
-
-		for _, t := range tpp {
-			fmt.Fprint(w, t.Name+"\t", "pre-built dependency\t", "install\n")
 		}
 
 		w.Flush()
@@ -141,6 +140,8 @@ func build(c *king.Config, td string, args []string) error {
 	for _, t := range tpp {
 		log.Runningf("installing pre-built dependency %s", t.Name)
 
+		// TODO forcefully install
+		// https://github.com/kiss-community/kiss/blob/edfb25aa2da44076dcb35b19f8e6cfddd5a66dfa/kiss#L659
 		if _, err := t.Install(lo); err != nil {
 			return err
 		}
@@ -185,6 +186,7 @@ func build(c *king.Config, td string, args []string) error {
 	return nil
 }
 
+// TODO return mpp(make dependencies)
 func resolveDependencies(c *king.Config, bpp []*king.Package, fT bool) (epp, dpp []*king.Package,
 	tpp []*king.Tarball, err error) {
 	mpp := make(map[string]bool, len(bpp))
@@ -271,6 +273,7 @@ func downloadSources(p *king.Package, do *king.DownloadOptions, fs, fn bool) err
 	for _, d := range dd {
 		if fn {
 			// TODO add package name to prefix
+			// >> downloading libX11-1.7.0.tar.bz2
 			log.Runningf("downloading %s", d)
 		}
 
@@ -298,6 +301,7 @@ func downloadSources(p *king.Package, do *king.DownloadOptions, fs, fn bool) err
 
 	for _, v := range vv {
 		// TODO add package name to prefix
+		// >> verifying libX11-1.7.0.tar.bz2
 		log.Runningf("verifying %s", v)
 
 		if err := v.Verify(); err != nil {
