@@ -79,7 +79,7 @@ example:
 
 option:
     --who-needs-checksums    allow internet connection during build
-    -X, --extract-dir <dir>	 set directory where pre-built packages will be extracted
+    -X, --extract-dir <dir>  set directory where pre-built packages will be extracted
     -P, --package-dir <dir>  set directory where packages will be turned into tarballs
     -B, --build-dir   <dir>  set directory where sources will be extracted
     -C, --compression <fmt>  select compression format
