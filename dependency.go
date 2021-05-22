@@ -11,9 +11,7 @@ import (
 
 // TODO better docs
 
-var (
-	ErrReverseDependenciesNotFound = errors.New("no package depends on target")
-)
+var ErrReverseDependenciesNotFound = errors.New("no package depends on target")
 
 // Dependency represents dependency of package.
 //
@@ -56,30 +54,16 @@ func (p *Package) Dependencies() ([]*Dependency, error) {
 	return dd, sc.Err()
 }
 
+// TODO deduplicate
+// TODO do not allow stack overflow due to circular dependencies
 func (p *Package) RecursiveDependencies() ([]*Dependency, error) {
-	return recursiveDependencies(p, "", make(map[string]bool))
-}
-
-func recursiveDependencies(p *Package, n string, mdd map[string]bool) ([]*Dependency, error) {
 	dd, err := p.Dependencies()
 
 	if err != nil {
 		return nil, err
 	}
 
-	dpp := make([]*Package, 0, len(dd))
-
 	for _, d := range dd {
-		if d.Name == n {
-			panic(fmt.Sprintf("parse %s dependencies: circular dependencies: [%s %s]", p.Name, d.Name, n))
-		}
-
-		if mdd[d.Name] {
-			continue
-		}
-
-		mdd[d.Name] = true
-
 		dp, err := NewPackage(p.cfg, &PackageOptions{
 			Name: d.Name,
 			From: p.From,
@@ -89,11 +73,7 @@ func recursiveDependencies(p *Package, n string, mdd map[string]bool) ([]*Depend
 			return nil, err
 		}
 
-		dpp = append(dpp, dp)
-	}
-
-	for _, dp := range dpp {
-		rdd, err := recursiveDependencies(dp, p.Name, mdd)
+		rdd, err := dp.RecursiveDependencies()
 
 		if errors.Is(err, os.ErrNotExist) {
 			continue
@@ -103,18 +83,7 @@ func recursiveDependencies(p *Package, n string, mdd map[string]bool) ([]*Depend
 			return nil, err
 		}
 
-		sdd := make([]*Dependency, 0, len(rdd))
-
-		for _, d := range rdd {
-			if mdd[d.Name] {
-				continue
-			}
-
-			mdd[d.Name] = true
-			sdd = append(sdd, d)
-		}
-
-		dd = append(sdd, dd...)
+		dd = append(rdd, dd...)
 	}
 
 	return dd, nil
