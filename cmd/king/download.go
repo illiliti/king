@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -72,8 +73,11 @@ func download(c *king.Config, args []string) error {
 					log.Runningf("downloading %s", d)
 				}
 
-				// TODO inform if already downloaded
-				if err := d.Download(do); err != nil {
+				err := d.Download(do)
+
+				if errors.Is(err, king.NoErrDownloadAlreadyDownloaded) {
+					log.Info(err)
+				} else if err != nil {
 					return err
 				}
 			}

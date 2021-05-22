@@ -276,8 +276,11 @@ func downloadSources(p *king.Package, do *king.DownloadOptions, fs, fn bool) err
 			log.Runningf("downloading %s", d)
 		}
 
-		// TODO inform if already downloaded
-		if err := d.Download(do); err != nil {
+		err := d.Download(do)
+
+		if errors.Is(err, king.NoErrDownloadAlreadyDownloaded) {
+			log.Info(err)
+		} else if err != nil {
 			return err
 		}
 	}
