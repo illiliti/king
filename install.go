@@ -19,9 +19,7 @@ import (
 // TODO unit tests
 // TODO better docs
 
-var (
-	ErrInstallUnmetDependencies = errors.New("target requires other packages")
-)
+var ErrInstallUnmetDependencies = errors.New("target requires other packages")
 
 // InstallOptions provides facilities for installing package.
 type InstallOptions struct {
@@ -166,13 +164,15 @@ func unmetDependencies(t *Tarball, edp string) error {
 			continue
 		}
 
-		p, err := NewPackage(t.cfg, &PackageOptions{
+		_, err := NewPackage(t.cfg, &PackageOptions{
 			Name: fi[0],
 			From: Database,
 		})
 
-		if err != nil {
-			pp = append(pp, p.Name)
+		if errors.Is(err, ErrPackageNameNotFound) {
+			pp = append(pp, fi[0])
+		} else if err != nil {
+			return err
 		}
 	}
 
