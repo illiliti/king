@@ -18,6 +18,9 @@ import (
 	"github.com/illiliti/king/manifest"
 )
 
+// TODO add orphans
+// TODO add repo-orphans
+
 func query(c *king.Config, args []string) error {
 	// TODO better var names
 	// TODO add "tree" feature
@@ -262,15 +265,10 @@ func querySize(c *king.Config, w io.Writer, n string) error {
 			continue
 		}
 
-		st, err := os.Lstat(filepath.Join(c.RootDir, p))
+		st, err := os.Stat(filepath.Join(c.RootDir, p))
 
 		if err != nil {
 			return err
-		}
-
-		// TODO warn
-		if !st.Mode().IsRegular() {
-			continue
 		}
 
 		z := uint64(st.Size())
@@ -363,7 +361,6 @@ func queryMaintainer(c *king.Config, w io.Writer, n string) error {
 	return nil
 }
 
-// TODO recursive
 func queryDependencies(c *king.Config, w io.Writer, n string, rt king.RepositoryType) error {
 	p, err := king.NewPackage(c, &king.PackageOptions{
 		Name: n,
@@ -375,6 +372,7 @@ func queryDependencies(c *king.Config, w io.Writer, n string, rt king.Repository
 	}
 
 	dd, err := p.Dependencies()
+	// TODO recursive tree
 	// dd, err := p.RecursiveDependencies()
 
 	if err != nil {
