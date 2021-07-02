@@ -109,6 +109,7 @@ func (p *Package) Sources() ([]Source, error) {
 	return ss, sc.Err()
 }
 
+// TODO ban ?no-extract
 func newGit(s, d string) (*Git, error) {
 	u, err := url.Parse(s)
 
@@ -204,13 +205,13 @@ func newFile(p *Package, s, d string) (*File, error) {
 }
 
 func (g *Git) String() string {
-	return g.URL
+	return path.Base(g.URL)
 }
 
 func (h *HTTP) String() string {
-	return h.URL
+	return path.Base(h.URL)
 }
 
 func (f *File) String() string {
-	return f.Path
+	return filepath.Base(f.Path)
 }
