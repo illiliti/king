@@ -99,7 +99,7 @@ func TestExtract(t *testing.T) {
 			d := filepath.Join(t.TempDir(), ss[0].ExtractDir())
 
 			if _, ok := ss[0].(*king.Git); ok && testing.Short() {
-				t.Skipf("skipping test %s that uses network", s.test)
+				t.Skip("skipping network test")
 			}
 
 			err = ss[0].Extract(d)
@@ -111,7 +111,7 @@ func TestExtract(t *testing.T) {
 			_, err = os.Stat(filepath.Join(d, s.check))
 
 			if err != nil {
-				t.Errorf("Extract() incorrectly unpacked %q into %q", s.check, d)
+				t.Errorf("%q was incorrectly unpacked into %q", s.check, d)
 			}
 		})
 	}
