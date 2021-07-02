@@ -17,9 +17,7 @@ import (
 // TODO unit tests
 // TODO better docs
 
-var (
-	ErrRemoveUnresolvedDependencies = errors.New("other packages depend on target")
-)
+var ErrRemoveUnresolvedDependencies = errors.New("other packages depend on target")
 
 // RemoveOptions provides facilities for removing package.
 type RemoveOptions struct {
