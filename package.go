@@ -11,7 +11,7 @@ import (
 
 var (
 	ErrPackagePathNotFound = errors.New("target not owned by any package")
-	ErrPackageNameNotFound = errors.New("target not found within specified database")
+	ErrPackageNameNotFound = errors.New("target not found in database/repository")
 )
 
 type RepositoryType uint
@@ -105,9 +105,6 @@ func newPackageByPath(c *Config, p string) (*Package, error) {
 	if err := c.initOwnedPaths(); err != nil {
 		return nil, fmt.Errorf("initialize owned paths: %w", err)
 	}
-
-	// c.ppm.Lock()
-	// defer c.ppm.Unlock()
 
 	if p, ok := c.pp[p]; ok {
 		return p, nil
