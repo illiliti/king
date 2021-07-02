@@ -2,6 +2,7 @@ package king
 
 import (
 	"bufio"
+	"context"
 	"debug/elf"
 	"errors"
 	"fmt"
@@ -69,6 +70,10 @@ type BuildOptions struct {
 //
 // See https://k1sslinux.org/package-system#2.0
 func (p *Package) Build(bo *BuildOptions) (*Tarball, error) {
+	return p.BuildContext(context.Background(), bo)
+}
+
+func (p *Package) BuildContext(ctx context.Context, bo *BuildOptions) (*Tarball, error) {
 	if err := bo.Validate(); err != nil {
 		return nil, fmt.Errorf("validate BuildOptions: %w", err)
 	}
@@ -114,7 +119,7 @@ func (p *Package) Build(bo *BuildOptions) (*Tarball, error) {
 		}
 	}
 
-	cmd := exec.Command(filepath.Join(p.Path, "build"), pd, v.Version)
+	cmd := exec.CommandContext(ctx, filepath.Join(p.Path, "build"), pd, v.Version)
 	cmd.Stdout = bo.Output
 	cmd.Stderr = bo.Output
 	cmd.Dir = bd
