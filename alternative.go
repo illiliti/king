@@ -13,9 +13,7 @@ import (
 // TODO unit tests
 // TODO better docs
 
-var (
-	ErrAlternativeNotFound = errors.New("conflict has not been occured yet")
-)
+var ErrAlternativeNotFound = errors.New("conflict has not been occured yet")
 
 // Alternative represents conflict between multiple packages.
 //
@@ -60,7 +58,6 @@ func NewAlternative(c *Config, ao *AlternativeOptions) (*Alternative, error) {
 
 func Alternatives(c *Config) ([]*Alternative, error) {
 	// TODO cache results
-	// TODO return map
 
 	dd, err := os.ReadDir(c.AlternativeDir)
 
