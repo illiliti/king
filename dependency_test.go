@@ -115,7 +115,6 @@ func TestDependsOnItself(t *testing.T) {
 }
 
 func TestCircularDependencies(t *testing.T) {
-	t.SkipNow() // XXX skip this test until i figure out how to properly implement it
 	t.Parallel()
 
 	c, err := king.NewConfig(&king.ConfigOptions{

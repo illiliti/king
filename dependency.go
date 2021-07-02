@@ -54,48 +54,10 @@ func (p *Package) Dependencies() ([]*Dependency, error) {
 	return dd, sc.Err()
 }
 
-// TODO deduplicate
-// TODO do not allow stack overflow due to circular dependencies
-func (p *Package) RecursiveDependencies() ([]*Dependency, error) {
-	dd, err := p.Dependencies()
-
-	if err != nil {
-		return nil, err
-	}
-
-	for _, d := range dd {
-		dp, err := NewPackage(p.cfg, &PackageOptions{
-			Name: d.Name,
-			From: p.From,
-		})
-
-		if err != nil {
-			return nil, err
-		}
-
-		rdd, err := dp.RecursiveDependencies()
-
-		if errors.Is(err, os.ErrNotExist) {
-			continue
-		}
-
-		if err != nil {
-			return nil, err
-		}
-
-		dd = append(rdd, dd...)
-	}
-
-	return dd, nil
-}
-
 func (p *Package) ReverseDependencies() ([]string, error) {
 	if err := p.cfg.initReverseDependencies(); err != nil {
 		return nil, fmt.Errorf("initialize reverse dependencies: %w", err)
 	}
-
-	// c.ddm.Lock()
-	// defer c.ddm.Unlock()
 
 	if dd, ok := p.cfg.dd[p.Name]; ok {
 		return dd, nil
