@@ -1,6 +1,7 @@
 package king
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -22,14 +23,25 @@ type UpdateOptions struct {
 	// ContinueOnError ignores possible errors during updating repositories.
 	ContinueOnError bool
 
-	// ExcludePackages ignores update for speficifed packages.
+	// ExcludePackages ignores update for specified packages.
 	ExcludePackages []string
 }
 
-// Update optionally pulls repositories and parses candidates for upgrade.
+// type Candidate struct {
+// 	*Package
+
+// 	ov *Version
+// 	nv *Version
+// }
+
+// Update optionally updates repositories and parses candidates for upgrade.
 func Update(c *Config, uo *UpdateOptions) ([]*Package, error) {
+	return UpdateContext(context.Background(), c, uo)
+}
+
+func UpdateContext(ctx context.Context, c *Config, uo *UpdateOptions) ([]*Package, error) {
 	if !uo.NoUpdateRepositories {
-		err := updateRepositories(c.Repositories)
+		err := updateRepositories(ctx, c.Repositories)
 
 		if !uo.ContinueOnError && err != nil {
 			return nil, fmt.Errorf("update repositories: %w", err)
@@ -114,7 +126,7 @@ func Update(c *Config, uo *UpdateOptions) ([]*Package, error) {
 	return pp, eg.Wait()
 }
 
-func updateRepositories(rr []string) error {
+func updateRepositories(ctx context.Context, rr []string) error {
 	for _, d := range rr {
 		rp, err := filepath.EvalSymlinks(d)
 
@@ -136,7 +148,7 @@ func updateRepositories(rr []string) error {
 			return err
 		}
 
-		err = w.Pull(&git.PullOptions{
+		err = w.PullContext(ctx, &git.PullOptions{
 			RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,
 		})
 
