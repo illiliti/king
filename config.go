@@ -19,6 +19,7 @@ import (
 //
 // See https://k1sslinux.org/package-manager#4.0
 // TODO embed ConfigOptions
+// TODO add SystemPackages[musl, pkgconf, ...]
 type Config struct {
 	// Repositories contains list of user-defined repositories.
 	Repositories []string
@@ -41,15 +42,14 @@ type Config struct {
 	db string
 	ad string
 
-	// TODO semaphores ?
-	// TODO save this info on disk ? /var/db/king/{owners,revdeps}
+	// TODO semaphores instead of mutexes?
 	ppc uint32
 	ppm sync.Mutex
 	pp  map[string]*Package
 
 	ddc uint32
 	ddm sync.Mutex
-	dd  map[string][]string
+	dd  map[string][]string // TODO []*Package
 }
 
 // ConfigOptions allows to configure returned configuration.
@@ -168,15 +168,11 @@ func (c *Config) initOwnedPaths() error {
 		})
 	}
 
-	err = eg.Wait()
+	if err := eg.Wait(); err != nil {
+		if errors.Is(err, errMultipleOwners) {
+			panic(err)
+		}
 
-	// it's better to panic here because DatabaseDir is malformed
-	// and we can't reliably operate with the whole Config anymore
-	if errors.Is(err, errMultipleOwners) {
-		panic(err)
-	}
-
-	if err != nil {
 		return err
 	}
 
@@ -264,6 +260,7 @@ func (c *Config) initReverseDependencies() error {
 func (c *Config) ResetOwnedPaths() {
 	c.ppm.Lock()
 	defer c.ppm.Unlock()
+	c.pp = nil
 	atomic.StoreUint32(&c.ppc, 0)
 }
 
@@ -271,5 +268,6 @@ func (c *Config) ResetOwnedPaths() {
 func (c *Config) ResetReverseDependencies() {
 	c.ddm.Lock()
 	defer c.ddm.Unlock()
+	c.dd = nil
 	atomic.StoreUint32(&c.ddc, 0)
 }
