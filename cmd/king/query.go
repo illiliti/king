@@ -24,6 +24,7 @@ import (
 func query(c *king.Config, args []string) error {
 	// TODO better var names
 	// TODO add "tree" feature
+	// FIXME this is mess
 	var (
 		fR bool
 		fS bool
@@ -79,6 +80,7 @@ func query(c *king.Config, args []string) error {
 
 	w := bufio.NewWriter(os.Stdout)
 
+	// FIXME this is mess
 	switch {
 	case fl:
 		err = listPackages(c, w, pf.Args())

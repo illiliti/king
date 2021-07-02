@@ -12,6 +12,7 @@ import (
 	"github.com/illiliti/king"
 )
 
+// TODO prompt to confirm
 func install(c *king.Config, td string, args []string) error {
 	lo := new(king.InstallOptions)
 

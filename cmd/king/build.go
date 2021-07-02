@@ -270,6 +270,7 @@ func downloadSources(p *king.Package, do *king.DownloadOptions, fs, fn bool) err
 	}
 
 	for _, d := range dd {
+		// TODO remove
 		if fn {
 			// TODO add package name to prefix
 			// >> downloading libX11-1.7.0.tar.bz2
@@ -278,7 +279,7 @@ func downloadSources(p *king.Package, do *king.DownloadOptions, fs, fn bool) err
 
 		err := d.Download(do)
 
-		if errors.Is(err, king.NoErrDownloadAlreadyDownloaded) {
+		if errors.Is(err, king.ErrDownloadAlreadyExist) {
 			log.Info(err)
 		} else if err != nil {
 			return err

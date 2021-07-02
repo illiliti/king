@@ -69,13 +69,14 @@ func download(c *king.Config, args []string) error {
 			log.Infof("no one source of %s needing download", p.Name)
 		} else {
 			for _, d := range dd {
+				// TODO remove
 				if fn {
 					log.Runningf("downloading %s", d)
 				}
 
 				err := d.Download(do)
 
-				if errors.Is(err, king.NoErrDownloadAlreadyDownloaded) {
+				if errors.Is(err, king.ErrDownloadAlreadyExist) {
 					log.Info(err)
 				} else if err != nil {
 					return err

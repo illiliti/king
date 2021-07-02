@@ -14,6 +14,8 @@ import (
 
 var version = "BETA"
 
+// TODO KISS_CHOICE KISS_HOOK KISS_COLOR KISS_KEEPLOG KISS_PID
+
 func root(args []string) error {
 	cd, err := os.UserCacheDir()
 
@@ -29,6 +31,8 @@ func root(args []string) error {
 	}
 
 	// td = filepath.Join(td, hash.Random(10))
+	// TODO KISS_PID
+	// TODO use XDG_STATE_HOME for builds
 	td = filepath.Join(td, strconv.Itoa(os.Getpid()))
 
 	// XXX be compatible with kiss... only for now

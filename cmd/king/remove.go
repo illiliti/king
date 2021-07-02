@@ -11,6 +11,7 @@ import (
 	"github.com/illiliti/king"
 )
 
+// TODO prompt to confirm
 func remove(c *king.Config, args []string) error {
 	var fr bool
 

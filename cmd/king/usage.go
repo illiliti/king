@@ -1,5 +1,7 @@
 package main
 
+// TODO move examples to man page
+
 const (
 	kingUsage = `usage: king [option]... <action> [<package>]...
 

@@ -13,6 +13,8 @@ import (
 	"github.com/illiliti/king"
 )
 
+// TODO remove this altogether. i need to think about it
+
 // TODO print how many packages are built/packages in terminal title
 // TODO print elapsed time
 
